@@ -95,3 +95,21 @@ simData = function (n, p, pnoise, sn_ratio = 0, featSimulator = simSplines, seed
   return (list(data = df_out, sim_poly = ll_simulator_out))
 }
 
+
+#' Check info in config data-frame
+#'
+#' @param df [data.frame()] Data frame with configurations for the data simulation.
+#' @return Logical value indicating if all information are there.
+checkBMData = function (df, silent = TRUE)
+{
+  clnames_required = c("n", "p", "pnoise", "sn_ratio", "rep")
+  if (! "data.frame" %in% class(df)) stop("df has to be a data.frame")
+  clnames = colnames(df)
+  clnames_are_there = clnames_required %in% clnames
+  if ((! all(clnames_are_there)) && (! silent)) {
+    msg = paste0("Data frame has no columns: ", paste(clnames_required[! clnames_are_there], collapse = ", "))
+    stop(msg)
+  }
+  return (all(clnames_are_there))
+}
+
