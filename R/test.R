@@ -1,0 +1,97 @@
+#' Get linear predictor from B-spline.
+#'
+#' @param x [numeric] Vector of x values
+#' @param bs_dim [integer(1)] Number of base functions for the spline (default = 10L). (Corresponds to number of inner knots for the spline).
+#' @param sigma [numeric(1)] Standard deviation for the normally distributed random variable from which the parameter are drawn (default = 3).
+#' @param offset [numeric(1)] Shift on the y-axis of the linear predictor (default = 0).
+#' @return The sum of \code{x} and \code{y}.
+simSplines = function(x, bs_dim = 10L, sigma = 3, offset = 0, ...)
+{
+  checkmate::assertNumeric(x = sigma, len = 1L)
+  checkmate::assertNumeric(x = offset, len = 1L)
+  if (bs_dim < 7) stop("Need bs_dim >= 7 !")
+
+  nk = bs_dim - 2
+
+  xu = max(x)
+  xl = min(x)
+
+  xr = xu - xl
+  xl = xl - xr * 0.001
+  xu = xu + xr * 0.001
+
+  dx = (xu - xl)/(nk - 1)
+  kn = seq(xl - dx * 3, xu + dx * 3, length = nk + 4 + 2)
+
+  # create the spline basis functions
+  X = splines::spline.des(kn, x, 4, x * 0)$design
+
+  # multiply with random coefficients to get random functions
+  coefs = rnorm(bs_dim, sd = sigma)
+
+  return (list(y = X %*% coefs + offset, x = x, X = X, offset = offset, coefs = coefs, knots = kn))
+}
+
+
+#' Simulate data set of size n x (p + pnoise)
+#'
+#' @param n [integer(1)] Number of observations.
+#' @param p [integer(1)] Number of features that have an effect on the response.
+#' @param pnoise [integer(1)] Number of noise features (that have no effect on the response).
+#' @param sn_ratio [numeric(1)] Signal to noise ratio sd(noise) / sd(mod) (default = 0.1).
+#' @param featSimulator [function] Function for the generation of the linear predictor and feature with effect (default = simSplines).
+#' @return The sum of \code{x} and \code{y}.
+simData = function (n, p, pnoise, sn_ratio = 0, featSimulator = simSplines, seed = sample(100000, 1), ...)
+{
+  ll_simulator_out = list()
+  ll_feats = list()
+  ll_linpred = list()
+  ll_noise = list()
+
+  for (i in seq_len(p)) {
+    # Simulate x value range somewhere between [0, 200]
+    xmin = runif(n = 1L, min = 0, max = 100)
+    xmax = xmin + runif(n = 1L, min = 0, max = 100)
+
+    # Simulate feature values as uniformly distributed in that range:
+    #x = sort(runif(n = n, min = xmin, max = xmax))
+    x = runif(n = n, min = xmin, max = xmax)
+
+    # Get values for the linear predictor using the feature simulator:
+    fs = featSimulator(x, ...)
+
+    # Write into lists:
+    ll_simulator_out[[i]] = list(x = x, y = fs$y, fs = fs)
+    ll_feats = c(ll_feats, list(x))
+    ll_linpred = c(ll_linpred, list(fs$y))
+  }
+
+  # Simulate noise feature:
+  for (i in seq_len(pnoise)) {
+    ll_noise = c(ll_noise, list(rnorm(n)))
+  }
+
+  ll_df = list()
+
+  # Get data frame from the "real" feature by cbinding them together:
+  df_feats = do.call(data.frame, ll_feats)
+  # Give reasonable names:
+  colnames(df_feats) = paste0("x", seq_len(p))
+
+  # Same for the noise feature:
+  df_noise = do.call(data.frame, ll_noise)
+  colnames(df_noise) = paste0("noise", seq_len(pnoise))
+
+  # Sum up "individual" linear predictors of the features:
+  target = rowSums(do.call(cbind, ll_linpred))
+
+  # Calculate the sd of the noise given the signal-to-noise ratio:
+  target_sd = sd(target) / sn_ratio
+  target = target +  rnorm(n, 0, target_sd)
+
+  # Get the final dataset with response (y), effects (x1, ..., xp), and noise features (noise1, noisepnoise):
+  df_out = cbind(data.frame(y = target), df_feats, df_noise)
+
+  return (list(data = df_out, sim_poly = ll_simulator_out))
+}
+
