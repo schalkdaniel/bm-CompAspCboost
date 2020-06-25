@@ -86,7 +86,11 @@ simData = function (n, p, pnoise, sn_ratio = 0, featSimulator = simSplines, seed
   target = rowSums(do.call(cbind, ll_linpred))
 
   # Calculate the sd of the noise given the signal-to-noise ratio:
-  target_sd = sd(target) / sn_ratio
+  if (sn_ratio == 0) {
+    target_sd = 0
+  } else {
+    target_sd = sd(target) / sn_ratio
+  }
   target = target +  rnorm(n, 0, target_sd)
 
   # Get the final dataset with response (y), effects (x1, ..., xp), and noise features (noise1, noisepnoise):
