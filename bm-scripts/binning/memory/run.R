@@ -29,14 +29,14 @@ if (config$rep == 1) {
   ## a data.frame with the snapshot data.
 
 
-  sys_call_base = "R -d \"valgrind --tool=massif --stacks=yes --threshold=0.1 --detailed-freq=1 --time-unit=B --verbose --trace-children=yes --massif-out-file="
+  sys_call_base = "R -d \"valgrind --tool=massif --stacks=yes --threshold=0 --detailed-freq=1 --time-unit=B --verbose --trace-children=yes --massif-out-file="
 
   massif_out_binning = paste0(base_sub_dir, "/massif.out.binning")
   massif_out_nobinning = paste0(base_sub_dir, "/massif.out.nobinning")
   log_file = paste0(base_sub_dir, "/temp-log.txt")
 
-  sys_call_binning   = paste0(sys_call_base, massif_out_binning, " --log-file=", log_file, "\" -e \"source('run-binning.R')\"")
-  sys_call_nobinning = paste0(sys_call_base, massif_out_nobinning, " --log-file=", log_file, "\" -e \"source('run-nobinning.R')\"")
+  sys_call_binning   = paste0(sys_call_base, massif_out_binning, " --log-file=", log_file, "\" -e \"source('", base_sub_dir, "/run-binning.R')\"")
+  sys_call_nobinning = paste0(sys_call_base, massif_out_nobinning, " --log-file=", log_file, "\" -e \"source('", base_sub_dir, "/run-nobinning.R')\"")
 
   system(sys_call_binning)
 
