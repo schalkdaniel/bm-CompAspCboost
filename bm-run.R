@@ -9,9 +9,9 @@ ns = c(5000L)
 #ps = c(5L, 10L, 20L, 50L)
 ps = c(5L, 10L)
 #pnoise_rel = c(0.5, 1, 2, 5)
-pnoise_rel = c(0.5, 1)
+pnoise_rel = c(0.5)
 #sn_ratio = c(0.1, 1, 10)
-sn_ratio = c(0.1, 1)
+sn_ratio = c(1)
 #reps = seq_len(20L)
 reps = seq_len(2L)
 
@@ -26,6 +26,7 @@ df_configs$pnoise_rel = NULL
 ## ---------------------------------------------------
 
 #bm_dirs = paste0("bm-scripts/binning/", c("memory", "runtime", "performance"))
-bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
+#bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
+bm_dirs = paste0("bm-scripts/categorical/", c("runtime"))
 
 runBM(df_configs, bm_dirs)
