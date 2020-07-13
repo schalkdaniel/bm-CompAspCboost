@@ -9,7 +9,6 @@ library(compboost)
 ## Load configuration and paste name of output file
 config = loadConfig(base_sub_dir)
 
-
 n_classes = c(5, 10, 20)
 p_inf_classes = c(0, 0.5)
 
@@ -18,15 +17,16 @@ config_classes$nic = trunc(config_classes$ncls * config_classes$pic)
 config_classes$pic = NULL
 
 
-for (ncls in config_classes$ncls) {
-  for (nic in config_classes$nic) {
+for (i in seq_len(nrow(config_classes))) {
+#for (ncls in config_classes$ncls) {
+  #for (nic in config_classes$nic) {
 
-    nm_save = paste0("xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-nclasses", ncls, "-informative-classes", nic, ".Rda")
+    nm_save = paste0("xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-nclasses", config_classes$ncls[i], "-informative-classes", config_classes$nic[i], ".Rda")
 
-    seed = trunc(config$n / (config$p + config$pnoise + ncls + nic) * config$sn_ratio)
+    seed = trunc(config$n / (config$p + config$pnoise + config_classes$ncls[i] + config_classes$nic[i]) * config$sn_ratio)
 
     set.seed(seed)
-    dat = simCategoricalData(config$n, config$p, config$pnoise, nclasses = ncls, ncnoise = nic)
+    dat = simCategoricalData(config$n, config$p, config$pnoise, nclasses = config_classes$ncls[i], ncnoise = config_classes$nic[i])
     dat_noise = dat$data
 
     set.seed(seed * config$rep)
@@ -109,7 +109,7 @@ for (ncls in config_classes$ncls) {
     factory_list_ridge = BlearnerFactoryList$new()
     temp = lapply(cnames[-which(cnames == "y")], function (fn) {
       cdata_source = CategoricalData$new(dat_noise[[fn]], paste0("x", fn))
-      bl = BaselearnerCategoricalRidge$new(cdata_source, list(df = ncls))
+      bl = BaselearnerCategoricalRidge$new(cdata_source, list(df = config_classes$ncls[i]))
       factory_list_ridge$registerFactory(bl)
     })
 
