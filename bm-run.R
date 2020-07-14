@@ -27,6 +27,6 @@ df_configs$pnoise_rel = NULL
 
 #bm_dirs = paste0("bm-scripts/binning/", c("memory", "runtime", "performance"))
 #bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
-bm_dirs = paste0("bm-scripts/categorical/", c("runtime"))
+bm_dirs = paste0("bm-scripts/categorical/", c("performance"))
 
-runBM(df_configs, bm_dirs)
+funBM(df_configs, bm_dirs)

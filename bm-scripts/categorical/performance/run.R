@@ -62,7 +62,7 @@ for (i in seq_len(nrow(config_classes))) {
     return (cdata_source)
   })
 
-  optimizer = OptimizerCoordinateDescent$new()
+  optimizer = OptimizerCoordinateDescent$new(parallel::detectCores() / 2)
 
   response_oob_binary = ResponseRegr$new("y", as.matrix(dat$data$y))
   data_oob_binary = lapply(cnames[cnames != "y"], function (fn) {
@@ -109,7 +109,7 @@ for (i in seq_len(nrow(config_classes))) {
     factory_list_ridge$registerFactory(bl)
   })
 
-  optimizer = OptimizerCoordinateDescent$new()
+  optimizer = OptimizerCoordinateDescent$new(parallel::detectCores() / 2)
 
   response_oob_ridge = ResponseRegr$new("y", as.matrix(dat$data$y))
   data_oob_ridge = lapply(cnames[cnames != "y"], function (fn) {
