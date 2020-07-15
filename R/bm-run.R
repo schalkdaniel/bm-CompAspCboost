@@ -3,12 +3,19 @@
 #' @param configs [data.frame()] Configuration for the data
 #' @param bm_dirs [character()] Vector of direcotries containing the code `run.R` for benchmarking
 #' @return Nothing, the results are written into single files
-runBM = function (configs, bm_dirs)
+runBM = function (configs, bm_dirs, cores = 1L)
 {
   chk = checkBMData(configs, FALSE)
 
   nconfigs = nrow(configs)
-  for (i in seq_len(nconfigs)) {
+
+  cl = parallel::makeCluster(cores)
+  doParallel::registerDoParallel(cl)
+
+  library(foreach)
+
+  #for (i in seq_len(nconfigs)) {
+  foreach::foreach(i = seq_len(nconfigs), .export = c("saveConfig", "checkBMData")) %dopar% {
     for (bmd in bm_dirs) {
       msg_trace = paste0(i, "/", nconfigs, ": dim(data)=", configs[i,"n"], "x(",
         configs[i,"p"], "+", configs[i,"pnoise"] ,"),  rep=", configs[i, "rep"],
@@ -21,6 +28,7 @@ runBM = function (configs, bm_dirs)
       system(paste0("Rscript ", bmd, "/run.R"))
     }
   }
+  parallel::stopCluster(cl)
 }
 
 
