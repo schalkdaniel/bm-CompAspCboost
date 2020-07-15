@@ -22,7 +22,14 @@ runBM = function (configs, bm_dirs, cores = 1L)
         ",  signal-to-noise-ratio=", configs[i,"sn_ratio"], ",  bm-dir=", bmd,
         "\n")
 
-      cat(msg_trace)
+      log_file = paste0(bmd, "/parallel-log.txt")
+      if (file.exists(log_file)) {
+        temp = readLines(log_file)
+        temp = c(temp, msg_trace)
+        writeLines(temp, log_file)
+      } else {
+        file.create(log_file)
+      }
 
       saveConfig(configs[i,], bmd)
       system(paste0("Rscript ", bmd, "/run.R"))
