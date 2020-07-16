@@ -17,22 +17,21 @@ runBM = function (configs, bm_dirs, cores = 1L)
   #for (i in seq_len(nconfigs)) {
   foreach::foreach(i = seq_len(nconfigs), .export = c("saveConfig", "checkBMData")) %dopar% {
     for (bmd in bm_dirs) {
-      msg_trace = paste0(i, "/", nconfigs, ": dim(data)=", configs[i,"n"], "x(",
+      msg_trace = paste0(as.character(Sys.time()), " ", i, "/", nconfigs, ": dim(data)=", configs[i,"n"], "x(",
         configs[i,"p"], "+", configs[i,"pnoise"] ,"),  rep=", configs[i, "rep"],
-        ",  signal-to-noise-ratio=", configs[i,"sn_ratio"], ",  bm-dir=", bmd,
-        "\n")
+        ",  signal-to-noise-ratio=", configs[i,"sn_ratio"], ",  bm-dir=", bmd)
 
       log_file = paste0(bmd, "/parallel-log.txt")
       if (file.exists(log_file)) {
         temp = readLines(log_file)
-        temp = c(temp, msg_trace)
+        temp[i] = msg_trace
         writeLines(temp, log_file)
       } else {
         file.create(log_file)
       }
 
-      saveConfig(configs[i,], bmd)
-      system(paste0("Rscript ", bmd, "/run.R"))
+      saveConfig(configs[i,], bmd, i)
+      system(paste0("Rscript ", bmd, "/run.R ", i))
     }
   }
   parallel::stopCluster(cl)
@@ -43,20 +42,20 @@ runBM = function (configs, bm_dirs, cores = 1L)
 #'
 #' @param config [data.frame()] Data frame with one row containing the configuration
 #' @param path [character(1L)] Directory where the file should be written to
-saveConfig = function (config, path = getwd())
+saveConfig = function (config, path = getwd(), id = "")
 {
   chk = checkBMData(config, FALSE)
   if (nrow(config) != 1) stop("Just one configuration should be saved!")
 
-  save(config, file = paste0(path, "/config.Rda"))
+  save(config, file = paste0(path, "/config", id, ".Rda"))
 }
 
 #' Load configuration from disk
 #'
 #' @param path [character(1L)] Directory with the `config.Rda` file in it
-loadConfig = function (path = getwd())
+loadConfig = function (path = getwd(), id = "")
 {
-  load(paste0(path, "/config.Rda"))
+  load(paste0(path, "/config", id, ".Rda"))
   chk = checkBMData(config, FALSE)
   if (nrow(config) != 1) stop("Just one configuration should be loaded!")
 
