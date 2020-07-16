@@ -18,8 +18,8 @@ config_classes$pic = NULL
 
 mstop = 20000L
 
-eps_for_break = 0.001
-patience = 5L
+eps_for_break = 0
+patience = 10L
 
 for (i in seq_len(nrow(config_classes))) {
 
