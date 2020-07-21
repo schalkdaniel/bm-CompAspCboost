@@ -4,12 +4,12 @@ Repository containing the benchmarks for the __Computational Aspects of Componen
 
 Done:
 - [ ] Binning:
-  - [ ] memory
+  - [X] memory
   - [ ] runtime
   - [ ] performance
 
 - [ ] Categorical:
-  - [ ] memory
+  - [X] memory
   - [ ] runtime
   - [ ] performance
   
