@@ -34,7 +34,7 @@ if (config$rep == 1) {
     seed = trunc(config$n / (config$p + config$pnoise + config_classes$ncls[i] + config_classes$nic[i]) * config$sn_ratio)
 
     cls_config = config_classes[i,]
-    save(cls_config, file = paste0(base_sub_dir, "/cls_config.Rda"))
+    save(cls_config, file = paste0(base_sub_dir, "/cls_config", cargs, ".Rda"))
 
 
     ## Run compboost:
@@ -49,14 +49,14 @@ if (config$rep == 1) {
 
     sys_call_base = "R -d \"valgrind --tool=massif --stacks=yes --threshold=0 --detailed-freq=1 --time-unit=B --verbose --trace-children=yes --massif-out-file="
 
-    massif_out_linear= paste0(base_sub_dir, "/massif.out.linear")
-    massif_out_binary= paste0(base_sub_dir, "/massif.out.binary")
-    massif_out_ridge= paste0(base_sub_dir, "/massif.out.ridge")
-    log_file = paste0(base_sub_dir, "/temp-log.txt")
+    massif_out_linear= paste0(base_sub_dir, "/massif.out.linear", cargs)
+    massif_out_binary= paste0(base_sub_dir, "/massif.out.binary", cargs)
+    massif_out_ridge= paste0(base_sub_dir, "/massif.out.ridge", cargs)
+    log_file = paste0(base_sub_dir, "/temp-log", cargs, ".txt")
 
-    sys_call_linear = paste0(sys_call_base, massif_out_linear, " --log-file=", log_file, "\" -e \"source('", base_sub_dir, "/run-linear.R')\"")
-    sys_call_binary = paste0(sys_call_base, massif_out_binary, " --log-file=", log_file, "\" -e \"source('", base_sub_dir, "/run-binary.R')\"")
-    sys_call_ridge = paste0(sys_call_base, massif_out_ridge, " --log-file=", log_file, "\" -e \"source('", base_sub_dir, "/run-ridge.R')\"")
+    sys_call_linear = paste0(sys_call_base, massif_out_linear, " --log-file=", log_file, "\" -e \"cargs = ", cargs, ";source('", base_sub_dir, "/run-linear.R')\"")
+    sys_call_binary = paste0(sys_call_base, massif_out_binary, " --log-file=", log_file, "\" -e \"cargs = ", cargs, ";source('", base_sub_dir, "/run-binary.R')\"")
+    sys_call_ridge = paste0(sys_call_base, massif_out_ridge, " --log-file=", log_file, "\" -e \"cargs = ", cargs, ";source('", base_sub_dir, "/run-ridge.R')\"")
 
     system(sys_call_linear)
 
@@ -115,7 +115,7 @@ if (config$rep == 1) {
     )
 
     if (file.exists(log_file)) file.remove(log_file)
-    if (file.exists(paste0(base_sub_dir, "/cls_config.Rda"))) file.remove(paste0(base_sub_dir, "/cls_config.Rda"))
+    if (file.exists(paste0(base_sub_dir, "/cls_config", cargs, ".Rda"))) file.remove(paste0(base_sub_dir, "/cls_config", cargs, ".Rda"))
 
     save(bm_extract, file = paste0(base_sub_dir, "/", nm_save))
     msg_log_worker = paste0(msg_log_worker, " - save")

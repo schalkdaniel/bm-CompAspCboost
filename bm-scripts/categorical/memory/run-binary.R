@@ -1,3 +1,4 @@
+# cargs = commandArgs(trailingOnly=TRUE)
 base_dir = "~/repos/bm-CompAspCboost"
 base_sub_dir = paste0(base_dir, "/bm-scripts/categorical/memory")
 
@@ -7,19 +8,23 @@ source(paste0(base_dir, "/R/bm-run.R"))
 library(compboost)
 
 ## Load configuration and paste name of output file
-config = loadConfig(base_sub_dir)
-load(paste0(base_sub_dir, "/cls_config.Rda"))
+config = loadConfig(base_sub_dir, cargs)
+load(paste0(base_sub_dir, "/cls_config", cargs, ".Rda"))
 
 seed = trunc(config$n / (config$p + config$pnoise + cls_config$ncls[1] + cls_config$nic[1]) * config$sn_ratio)
 
 set.seed(seed)
 dat = simCategoricalData(config$n, config$p, config$pnoise, nclasses = cls_config$ncls[1], ncnoise = cls_config$nic[1])
+
+cnames = colnames(dat$data)
+for (fn in cnames[cnames != "y"]) {
+  dat$data[[fn]] = as.character(dat$data[[fn]])
+}
+
 dat_noise = dat$data
 
 set.seed(seed * config$rep)
 dat_noise$y = rnorm(n = config$n, mean = dat_noise$y, sd = sd(dat_noise$y) / config$sn_ratio)
-
-cnames = colnames(dat_noise)
 
 
 mstop = 200L
