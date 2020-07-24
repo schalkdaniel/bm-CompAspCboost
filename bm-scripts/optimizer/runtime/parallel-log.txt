@@ -1,4 +1,0 @@
-2020-07-24 21:36:34 1/4: dim(data)=5000x(5+2),  rep=1,  signal-to-noise-ratio=1,  bm-dir=bm-scripts/optimizer/runtime
-2020-07-24 21:36:47 2/4: dim(data)=5000x(10+5),  rep=1,  signal-to-noise-ratio=1,  bm-dir=bm-scripts/optimizer/runtime
-2020-07-24 21:37:09 3/4: dim(data)=5000x(5+2),  rep=2,  signal-to-noise-ratio=1,  bm-dir=bm-scripts/optimizer/runtime
-2020-07-24 21:37:22 4/4: dim(data)=5000x(10+5),  rep=2,  signal-to-noise-ratio=1,  bm-dir=bm-scripts/optimizer/runtime
