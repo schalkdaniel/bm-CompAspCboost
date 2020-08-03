@@ -1,5 +1,7 @@
+cargs = commandArgs(trailingOnly=TRUE)
 base_dir = "~/repos/bm-CompAspCboost"
 base_sub_dir = paste0(base_dir, "/bm-scripts/categorical/performance")
+config_file = paste0(base_sub_dir, "/config", cargs, ".Rmd")
 
 source(paste0(base_dir, "/R/bm-sim-data.R"))
 source(paste0(base_dir, "/R/bm-run.R"))
@@ -7,7 +9,11 @@ source(paste0(base_dir, "/R/bm-run.R"))
 library(compboost)
 
 ## Load configuration and paste name of output file
-config = loadConfig(base_sub_dir)
+config = loadConfig(base_sub_dir, cargs)
+
+msg_log_worker = paste0(as.character(Sys.time()), " >> ", cargs, ": Loading config with:n=", config$n, " p=",
+  config$p, " pnoise=", config$pnoise ,"  rep=", config$rep,
+  "  signal-to-noise-ratio=", config$sn_rateio)
 
 n_classes = c(5, 10, 20)
 p_inf_classes = c(0, 0.5)
@@ -41,6 +47,7 @@ for (i in seq_len(nrow(config_classes))) {
   dat_noise$y = rnorm(n = config$n, mean = dat_noise$y, sd = sd(dat_noise$y) / config$sn_ratio)
 
 
+  msg_log_worker = paste0(msg_log_worker, "\n  ", i, " Create data")
 
 
   ## Write compboost code here:
@@ -96,6 +103,8 @@ for (i in seq_len(nrow(config_classes))) {
   })
   time_fit_binary = proc.time() - time_start_binary + time_init_binary
 
+  msg_log_worker = paste0(msg_log_worker, " - binary")
+
   ## Ridge base-learner
 
   time_start_ridge = proc.time()
@@ -142,6 +151,8 @@ for (i in seq_len(nrow(config_classes))) {
   })
   time_fit_ridge = proc.time() - time_start_ridge + time_init_ridge
 
+  msg_log_worker = paste0(msg_log_worker, " - ridge")
+
  ## ------------------------------------
 
   ## Save results:
@@ -166,8 +177,20 @@ for (i in seq_len(nrow(config_classes))) {
   )
 
   save(bm_extract, file = paste0(base_sub_dir, "/", nm_save))
+
+  msg_log_worker = paste0(msg_log_worker, " - save")
+
 }
 
+log_file = paste0(base_sub_dir, "/worker_log.txt")
+if (file.exists(log_file)) {
+  temp = readLines(log_file)
+  temp = c(temp, msg_log_worker)
+  writeLines(temp, log_file)
+} else {
+  file.create(log_file)
+}
 
+if (file.exists(config_file)) file.remove(config_file)
 
 
