@@ -8,7 +8,7 @@ source(paste0(base_dir, "/R/bm-run.R"))
 
 library(compboost)
 
-momentums = c(0.1, 0.2, 0.3)
+momentums = c(0.1)
 
 for (mom in momentums) {
 
