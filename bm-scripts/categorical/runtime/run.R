@@ -192,5 +192,4 @@ if (file.exists(log_file)) {
   file.create(log_file)
 }
 
-
 if (file.exists(config_file)) file.remove(config_file)
