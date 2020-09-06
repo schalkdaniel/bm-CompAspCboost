@@ -25,6 +25,7 @@ df_configs$pnoise_rel = NULL
 runBM(df_configs, bm_dirs, cores = 15L)
 #bm_dirs = paste0("bm-scripts/categorical/", c("performance"))
 #bm_dirs = paste0("bm-scripts/categorical/", c("memory"))
-bm_dirs = "bm-scripts/optimizer/performance"
+#bm_dirs = "bm-scripts/optimizer/performance"
+bm_dirs = "bm-scripts/optimizer/runtime"
 
 runBM(df_configs, bm_dirs)
