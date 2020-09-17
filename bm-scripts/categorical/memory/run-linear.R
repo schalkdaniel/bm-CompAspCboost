@@ -1,4 +1,4 @@
-# cargs = commandArgs(trailingOnly=TRUE)
+cargs = commandArgs(trailingOnly=TRUE)
 base_dir = "~/repos/bm-CompAspCboost"
 base_sub_dir = paste0(base_dir, "/bm-scripts/categorical/memory")
 
