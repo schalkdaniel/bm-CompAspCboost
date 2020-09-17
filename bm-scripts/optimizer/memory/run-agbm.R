@@ -1,5 +1,6 @@
+#cargs = commandArgs(trailingOnly=TRUE)
 base_dir = "~/repos/bm-CompAspCboost"
-base_sub_dir = paste0(base_dir, "/bm-scripts/binning/memory")
+base_sub_dir = paste0(base_dir, "/bm-scripts/optimizer/memory")
 
 source(paste0(base_dir, "/R/bm-sim-data.R"))
 source(paste0(base_dir, "/R/bm-run.R"))
@@ -7,7 +8,7 @@ source(paste0(base_dir, "/R/bm-run.R"))
 library(compboost)
 
 ## Load configuration and paste name of output file
-config = loadConfig(base_sub_dir)
+config = loadConfig(base_sub_dir, cargs)
 
 ## Simulate data and create data with noise:
 seed = trunc(config$n / (config$p + config$pnoise) * config$sn_ratio)
@@ -26,14 +27,19 @@ mstop = 200L
 ## Write compboost code here:
 ## ------------------------------------
 
-## binning
+## AGBM
 
-cboost_binning = Compboost$new(dat_noise, "y", loss = LossQuadratic$new())
+cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(),
+  optimizer = OptimizerAGBM$new(0.0001))
 temp = lapply(cnames[cnames != "y"], function (feat) {
-  cboost_binning$addBaselearner(feat, "spline", BaselearnerPSpline, bin_root = 2)
+  cboost_agbm$addBaselearner(feat, "spline", BaselearnerPSpline)
 })
+
+cboost_agbm$addLogger(logger = LoggerTime, use_as_stopper = FALSE, logger_id = "time",
+  max_time = 0, time_unit = "seconds")
 
 temp = capture.output({
-  cboost_binning$train(mstop, trace = 0)
+  cboost_agbm$train(mstop, trace = 0)
 })
+
 

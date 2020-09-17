@@ -46,28 +46,31 @@ for (fn in files) {
 }
 df_binning_memory = do.call("rbind", ll_rows)
 
+
 # Plot real memory as lines:
 # --------------------------
 
+## NOT RELEVANT!!!
+
 #gg = df_binning_memory %>%
-df_binning_memory %>%
-  ggplot(aes(x = nrows, y = mem / 1024, color = method)) +
-    geom_line() +
-    geom_point() +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))[-c(1,2)]) +
-    scale_color_viridis(discrete = TRUE) +
-    xlab("Number of Rows") +
-    ylab("Allocated Memory in GB") +
-    labs(color = "") +
-    facet_grid(ncolsnoise ~ ncols, scales = "free_y")
+#df_binning_memory %>%
+  #ggplot(aes(x = nrows, y = mem / 1024, color = method)) +
+    #geom_line() +
+    #geom_point() +
+    #theme_minimal(base_family = "Gyre Bonum") +
+    #theme(
+      #strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+      #strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+      #axis.text.x = element_text(angle = 45, vjust = 0.5),
+      #axis.text = element_text(size = 8 * font_scale),
+      #axis.title = element_text(size = 10 * font_scale)
+    #) +
+    #scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))[-c(1,2)]) +
+    #scale_color_viridis(discrete = TRUE) +
+    #xlab("Number of Rows") +
+    #ylab("Allocated Memory in GB") +
+    #labs(color = "") +
+    #facet_grid(ncolsnoise ~ ncols, scales = "free_y")
 
 #dinA4width = 210 * font_scale
 #ggsave(plot = gg, filename = "memory_lines.pdf", width = dinA4width * 2/3 * 0.6, height = dinA4width * 2/3, units = "mm")
@@ -77,34 +80,105 @@ df_binning_memory %>%
 # Plot used memory (proportional):
 # --------------------------------
 
-#gg = df_binning_memory %>%
-df_binning_memory %>%
+df_plt_mem = df_binning_memory %>%
+  filter(ncolsnoise == 10) %>%
   group_by(nrows, ncols, ncolsnoise, method) %>%
-  summarize(mean_mem = mean(mem)) %>%
-  group_by(nrows, ncols, ncolsnoise) %>%
-  summarize(rel_mem = mean_mem[method == "no binning"] / mean_mem[method == "binning"]) %>%
-  ggplot(aes(x = nrows, y = rel_mem, color = as.factor(ncolsnoise))) +
-    geom_hline(yintercept = 1, col = "dark red", lty = 2) +
-    geom_line() +
-    geom_point() +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))[-c(1,2)]) +
-    scale_color_viridis(discrete = TRUE) +
-    xlab("Number of Rows") +
-    ylab("Relative Allocated Memory") +
-    labs(color = "Number of\nNoise Features") +
-    facet_grid(. ~ ncols, scales = "free_y")
+  summarize(mean_mem = median(mem)) %>%
+  group_by(nrows, ncolsnoise, ncols) %>%
+  summarize(rel_mem = mean_mem[method == "no binning"] / mean_mem[method == "binning"], ptotal = ncols[1] + ncolsnoise[1])
+
+df_plt_mem$ptotal = factor(df_plt_mem$ptotal, levels = as.character(sort(unique(df_plt_mem$ptotal))))
+
+gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
+  geom_hline(yintercept = 1, col = "dark red", lty = 2) +
+  geom_line() +
+  geom_point() +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale)
+  ) +
+  scale_color_viridis(discrete = TRUE) +
+  xlab("Number of Rows") +
+  ylab("Relative Allocated Memory") +
+  labs(color = "Number of\nFeatures") #+
+  #facet_grid(. ~ ncols, scales = "free_y")
 
 #dinA4width = 210 * font_scale
 #ggsave(plot = gg, filename = "memory_rel_lines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.5, units = "mm")
 
+
+
+## runtime
+## ----------------------------------------------
+
+files = list.files("runtime")
+files = files[grep("xxx", files)]
+
+ll_rows = list()
+k = 1
+
+for (fn in files) {
+  load(paste0("runtime/", fn))
+  ll_rows[[k]] = data.frame(
+    date        = bm_extract$date,
+    data_seed   = bm_extract$data_seed,
+    nrows       = bm_extract$config$n,
+    ncols       = bm_extract$config$p,
+    sn_ratio    = bm_extract$config$sn_ratio,
+    rep         = bm_extract$config$rep,
+    ncolsnoise  = bm_extract$config$pnoise,
+    time_init   = c(bm_extract$time_nobinning["init.elapsed"], bm_extract$time_binning["init.elapsed"]),
+    time_fit   = c(bm_extract$time_nobinning["fit.elapsed"], bm_extract$time_binning["fit.elapsed"]),
+    method      = c("nobinning", "binning")
+  )
+  k = k+1
+}
+df_binning_runtime = do.call("rbind", ll_rows)
+
+
+df_plt_run = df_binning_runtime %>%
+  mutate(time = time_init + time_fit) %>%
+  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise) %>%
+  summarize(
+    rel_time_init = time_init[method == "nobinning"] / time_init[method == "binning"],
+    rel_time_fit = time_fit[method == "nobinning"] / time_fit[method == "binning"],
+    rel_time = time[method == "nobinning"] / time[method == "binning"],
+    ptotal = ncols[1] + ncolsnoise[1]
+  ) %>%
+  gather(key = "phase", value = "rel_time", starts_with("rel_time"))
+
+df_plt_run$phase[df_plt_run$phase == "rel_time"] = "Initialization + Fitting"
+df_plt_run$phase[df_plt_run$phase == "rel_time_init"] = "Initialization"
+df_plt_run$phase[df_plt_run$phase == "rel_time_fit"] = "Fitting"
+df_plt_run$phase = factor(df_plt_run$phase, levels = c("Initialization + Fitting", "Initialization", "Fitting"))
+
+df_plt_run$ptotal = factor(df_plt_run$ptotal, levels = as.character(sort(unique(df_plt_run$ptotal))))
+
+
+gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
+  geom_hline(yintercept = 1, lty = 2, col = "dark red") +
+  geom_violin(alpha = 0.2) +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale)
+  ) +
+  scale_color_viridis(discrete=TRUE) +
+  scale_fill_viridis(discrete=TRUE) +
+  xlab("Number of Rows") +
+  ylab("Relative Speedup") +
+  labs(color = "Number of\nFeatures", fill = "Number of\nFeatures") +
+  facet_grid(. ~ phase, scales = "free_y")
+
+#dinA4width = 210 * font_scale
+#ggsave(plot = gg, filename = "runtime_rel_violines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.5, units = "mm")
 
 
 ## performance
@@ -217,65 +291,6 @@ gg + scale_color_viridis(discrete = TRUE)
 
 
 
-
-
-## runtime
-## ----------------------------------------------
-
-files = list.files("runtime")
-files = files[grep("xxx", files)]
-
-ll_rows = list()
-k = 1
-
-for (fn in files) {
-  load(paste0("runtime/", fn))
-  ll_rows[[k]] = data.frame(
-    date        = bm_extract$date,
-    data_seed   = bm_extract$data_seed,
-    nrows       = bm_extract$config$n,
-    ncols       = bm_extract$config$p,
-    sn_ratio    = bm_extract$config$sn_ratio,
-    rep         = bm_extract$config$rep,
-    ncolsnoise  = bm_extract$config$pnoise,
-    time_init   = c(bm_extract$time_nobinning["init.elapsed"], bm_extract$time_binning["init.elapsed"]),
-    time_fit   = c(bm_extract$time_nobinning["fit.elapsed"], bm_extract$time_binning["fit.elapsed"]),
-    method      = c("nobinning", "binning")
-  )
-  k = k+1
-}
-df_binning_runtime = do.call("rbind", ll_rows)
-
-
-#gg = df_binning_runtime %>%
-df_binning_runtime %>%
-  mutate(time = time_init + time_fit) %>%
-  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise) %>%
-  summarize(
-    rel_time_init = time_init[method == "nobinning"] / time_init[method == "binning"],
-    rel_time_fit = time_fit[method == "nobinning"] / time_fit[method == "binning"],
-    rel_time = time[method == "nobinning"] / time[method == "binning"]
-  ) %>%
-  gather(key = "phase", value = "rel_time", starts_with("rel_time")) %>%
-  ggplot(aes(x = as.factor(nrows), y = rel_time, color = phase)) +
-    geom_hline(yintercept = 1, lty = 2, col = "dark red") +
-    geom_violin(alpha = 0.5) +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    scale_color_viridis(discrete=TRUE) +
-    xlab("Number of Rows") +
-    ylab("Relative Speedup") +
-    labs(color = "Phase") +
-    facet_grid(ncolsnoise ~ ncols, scales = "free_y")
-
-#dinA4width = 210 * font_scale
-#ggsave(plot = gg, filename = "runtime_rel_violines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3, units = "mm")
 
 
 

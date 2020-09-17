@@ -16,6 +16,9 @@ font_scale = 3
 ## memory
 ## ----------------------------------------------
 
+# Load local data:
+# -------------------
+
 files = list.files("memory")
 files = files[grep("xxx", files)]
 
@@ -48,63 +51,141 @@ for (fn in files) {
 }
 df_cat_memory = do.call("rbind", ll_rows)
 
+# Plot real memory as lines:
+# --------------------------
+
+## NOT RELEVANT!!!
+
 #gg = df_cat_memory %>%
-df_cat_memory %>%
-  group_by(nrows, ncols, ncolsnoise, method, nclasses) %>%
-  summarize(mem = median(mem)) %>%
-  ggplot(aes(x = nrows, y = mem / 1024, color = method, linetype = as.factor(nclasses))) +
-    geom_line() +
-    geom_point() +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    scale_x_continuous(breaks = sort(unique(df_cat_memory$nrows))[-c(1,2)]) +
-    scale_color_viridis(discrete = TRUE) +
-    xlab("Number of Rows") +
-    ylab("Allocated Memory in GB") +
-    labs(color = "") +
-    facet_grid(ncolsnoise ~ ncols, scales = "free_y")
+#df_cat_memory %>%
+  #group_by(nrows, ncols, ncolsnoise, method, nclasses) %>%
+  #summarize(mem = median(mem)) %>%
+  #ggplot(aes(x = nrows, y = mem / 1024, color = method, linetype = as.factor(nclasses))) +
+    #geom_line() +
+    #geom_point() +
+    #theme_minimal(base_family = "Gyre Bonum") +
+    #theme(
+      #strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+      #strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+      #axis.text.x = element_text(angle = 45, vjust = 0.5),
+      #axis.text = element_text(size = 8 * font_scale),
+      #axis.title = element_text(size = 10 * font_scale)
+    #) +
+    #scale_x_continuous(breaks = sort(unique(df_cat_memory$nrows))[-c(1,2)]) +
+    #scale_color_viridis(discrete = TRUE) +
+    #xlab("Number of Rows") +
+    #ylab("Allocated Memory in GB") +
+    #labs(color = "") +
+    #facet_grid(ncolsnoise ~ ncols, scales = "free_y")
 
 #dinA4width = 210 * font_scale
 #ggsave(plot = gg, filename = "memory_lines.pdf", width = dinA4width * 2/3 * 0.6, height = dinA4width * 2/3, units = "mm")
 
 
+# Plot used memory (proportional):
+# --------------------------------
 
-
-
-#gg = df_cat_memory %>%
-df_cat_memory %>%
+df_plt_mem = df_cat_memory %>%
   group_by(nrows, ncols, ncolsnoise, method, nclasses) %>%
   summarize(mem = median(mem)) %>%
   group_by(nrows, ncols, ncolsnoise, nclasses) %>%
-  summarize(rel_mem_bin = mem[method == "linear"] / mem[method == "binary"], rel_mem_ridge = mem[method == "linear"] / mem[method == "ridge"]) %>%
-  gather(key = "method", value = "rel_mem", starts_with("rel_mem")) %>%
-  ggplot(aes(x = nrows, y = rel_mem, color = method, linetype = as.factor(nclasses))) +
-    geom_hline(yintercept = 1, col = "dark red", lty = 2) +
-    geom_line() +
-    geom_point() +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    #scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))[-c(1,2)]) +
-    scale_color_viridis(discrete = TRUE) +
-    xlab("Number of Rows") +
-    ylab("Relative Allocated Memory") +
-    labs(color = "Number of\nClasses") +
-    facet_grid(ncolsnoise ~ ncols, scales = "free_y")
+  summarize(rel_mem_bin = mem[method == "linear"] / mem[method == "binary"], rel_mem_ridge = mem[method == "linear"] / mem[method == "ridge"], ptotal = ncols[1] + ncolsnoise[1]) %>%
+  gather(key = "method", value = "rel_mem", starts_with("rel_mem"))
+
+df_plt_mem$ptotal = factor(df_plt_mem$ptotal, levels = as.character(sort(unique(df_plt_mem$ptotal))))
+df_plt_mem$method[df_plt_mem$method == "rel_mem_bin"] = "Binary"
+df_plt_mem$method[df_plt_mem$method == "rel_mem_ridge"] = "Ridge"
+
+gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
+  geom_hline(yintercept = 1, col = "dark red", lty = 2) +
+  geom_line() +
+  geom_point() +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale)
+  ) +
+  scale_color_viridis(discrete = TRUE) +
+  xlab("Number of Rows") +
+  ylab("Relative Allocated Memory") +
+  labs(color = "Number of\nFeatures") +
+  facet_grid(factor(paste0(nclasses, " classes"), levels = paste0(sort(unique(nclasses)), " classes")) ~ method, scales= "free_y")
+  #facet_grid(method ~ factor(paste0(nclasses, " classes"), levels = paste0(sort(unique(nclasses)), " classes")))
+  #facet_grid(method ~ nclasses, scales = "free_y")
 
 #dinA4width = 210 * font_scale
 #ggsave(plot = gg, filename = "memory_rel_lines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.5, units = "mm")
+
+
+## runtime
+## ----------------------------------------------
+
+files = list.files("runtime")
+files = files[grep("xxx", files)]
+
+ll_rows = list()
+
+k = 1
+for (fn in files) {
+  load(paste0("runtime/", fn))
+  ncls = as.integer(strsplit(x = strsplit(x = fn, split = "nclasses")[[1]][2], split = "-informative")[[1]][1])
+  nic = as.integer(strsplit(x = strsplit(x = fn, split = "informative-classes")[[1]][2], split = ".Rda")[[1]][1])
+  ll_rows[[k]] = data.frame(
+    date        = bm_extract$date,
+    data_seed   = bm_extract$data_seed,
+    nrows       = bm_extract$config$n,
+    ncols       = bm_extract$config$p,
+    sn_ratio    = bm_extract$config$sn_ratio,
+    nclasses    = ncls,
+    nnoninfocls = bm_extract$config_classes["nic"][1,1],
+    rep         = bm_extract$config$rep,
+    ncolsnoise  = bm_extract$config$pnoise,
+    time        = c(sum(bm_extract$time_linear), sum(bm_extract$time_binary), sum(bm_extract$time_ridge)),
+    method      = c("linear", "binary", "ridge")
+  )
+  k = k+1
+}
+df_cat_runtime = do.call("rbind", ll_rows)
+
+df_plt_run = df_cat_runtime %>%
+  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise, nclasses) %>%
+  summarize(
+    rel_time_binary = time[method == "linear"] / time[method == "binary"],
+    rel_time_ridge = time[method == "linear"] / time[method == "ridge"],
+    ptotal = ncols[1] + ncolsnoise[1]
+  ) %>%
+  gather(key = "method", value = "rel_time", starts_with("rel_time"))
+
+df_plt_run$ptotal = factor(df_plt_run$ptotal, levels = as.character(sort(unique(df_plt_run$ptotal))))
+df_plt_run$method[df_plt_run$method == "rel_time_binary"] = "Binary"
+df_plt_run$method[df_plt_run$method == "rel_time_ridge"] = "Ridge"
+
+gg = ggplot(data = df_plt_run, aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
+  geom_hline(yintercept = 1, lty = 2, col = "dark red") +
+  geom_violin(alpha = 0.5) +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale)
+  ) +
+  scale_color_viridis(discrete=TRUE) +
+  scale_fill_viridis(discrete=TRUE) +
+  xlab("Number of Rows") +
+  ylab("Relative Speedup") +
+  labs(color = "Number of\nFeatures", fill = "Number of\nFeatures") +
+  facet_grid(factor(paste0(nclasses, " classes"), levels = paste0(sort(unique(nclasses)), " classes")) ~ method )
+  #facet_grid(method ~ factor(paste0(nclasses, " classes"), levels = paste0(sort(unique(nclasses)), " classes")))
+  #facet_grid(method ~ nclassess, scales = "free_y")
+
+#dinA4width = 210 * font_scale
+#ggsave(plot = gg, filename = "runtime_rel_violines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.5, units = "mm")
+
 
 
 
@@ -186,67 +267,6 @@ for (efct in ll_effect) {
 gg + scale_color_viridis(discrete = TRUE)
 
 
-
-## runtime
-## ----------------------------------------------
-
-files = list.files("runtime")
-files = files[grep("xxx", files)]
-
-ll_rows = list()
-
-k = 1
-for (fn in files) {
-  load(paste0("runtime/", fn))
-  ncls = as.integer(strsplit(x = strsplit(x = fn, split = "nclasses")[[1]][2], split = "-informative")[[1]][1])
-  nic = as.integer(strsplit(x = strsplit(x = fn, split = "informative-classes")[[1]][2], split = ".Rda")[[1]][1])
-  ll_rows[[k]] = data.frame(
-    date        = bm_extract$date,
-    data_seed   = bm_extract$data_seed,
-    nrows       = bm_extract$config$n,
-    ncols       = bm_extract$config$p,
-    sn_ratio    = bm_extract$config$sn_ratio,
-    nclasses    = ncls,
-    nnoninfocls = bm_extract$config_classes["nic"][1,1],
-    rep         = bm_extract$config$rep,
-    ncolsnoise  = bm_extract$config$pnoise,
-    time        = c(sum(bm_extract$time_linear), sum(bm_extract$time_binary), sum(bm_extract$time_ridge)),
-    method      = c("linear", "binary", "ridge")
-  )
-  k = k+1
-}
-df_cat_runtime = do.call("rbind", ll_rows)
-
-#gg = df_cat_runtime %>%
-df_cat_runtime %>%
-  #mutate(time = time_init + time_fit) %>%
-  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise, nclasses) %>%
-  summarize(
-    #rel_time_init = time_init[method == "nobinning"] / time_init[method == "binning"],
-    #rel_time_fit = time_fit[method == "nobinning"] / time_fit[method == "binning"],
-    rel_time_binary = time[method == "linear"] / time[method == "binary"],
-    rel_time_ridge = time[method == "linear"] / time[method == "ridge"]
-  ) %>%
-  gather(key = "method", value = "rel_time", starts_with("rel_time")) %>%
-  ggplot(aes(x = as.factor(nrows), y = rel_time, color = method, linetype = as.factor(nclasses))) +
-    geom_hline(yintercept = 1, lty = 2, col = "dark red") +
-    geom_violin(alpha = 0.5) +
-    theme_minimal(base_family = "Gyre Bonum") +
-    theme(
-      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      axis.text.x = element_text(angle = 45, vjust = 0.5),
-      axis.text = element_text(size = 8 * font_scale),
-      axis.title = element_text(size = 10 * font_scale)
-    ) +
-    scale_color_viridis(discrete=TRUE) +
-    xlab("Number of Rows") +
-    ylab("Relative Speedup") +
-    labs(color = "Method") +
-    facet_grid(ncolsnoise ~ ncols, scales = "free_y")
-
-#dinA4width = 210 * font_scale
-#ggsave(plot = gg, filename = "runtime_rel_violines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3, units = "mm")
 
 
 

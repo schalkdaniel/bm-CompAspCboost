@@ -1,5 +1,5 @@
 base_dir = "~/repos/bm-CompAspCboost"
-base_sub_dir = paste0(base_dir, "/bm-scripts/binning/memory")
+base_sub_dir = paste0(base_dir, "/bm-scripts/optimizer/memory")
 
 source(paste0(base_dir, "/R/bm-sim-data.R"))
 source(paste0(base_dir, "/R/bm-run.R"))
@@ -26,18 +26,14 @@ mstop = 200L
 ## Write compboost code here:
 ## ------------------------------------
 
-## No binning
+## COD
 
-cboost_nobinning = Compboost$new(dat_noise, "y", loss = LossQuadratic$new())
+cboost_cod = Compboost$new(dat_noise, "y", loss = LossQuadratic$new())
 temp = lapply(cnames[cnames != "y"], function (feat) {
-  cboost_nobinning$addBaselearner(feat, "spline", BaselearnerPSpline)
+  cboost_cod$addBaselearner(feat, "spline", BaselearnerPSpline, bin_root = 2)
 })
-
-cboost_nobinning$addLogger(logger = LoggerTime, use_as_stopper = FALSE, logger_id = "time",
-  max_time = 0, time_unit = "seconds")
 
 temp = capture.output({
-  cboost_nobinning$train(mstop, trace = 0)
+  cboost_cod$train(mstop, trace = 0)
 })
-
 

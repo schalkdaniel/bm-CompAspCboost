@@ -6,6 +6,8 @@ config_file = paste0(base_sub_dir, "/config", cargs, ".Rmd")
 source(paste0(base_dir, "/R/bm-sim-data.R"))
 source(paste0(base_dir, "/R/bm-run.R"))
 
+config = data.frame(n = 50000L, p = 50, sn_ratio = 1, rep = 1, pnoise = 50)
+
 momentums = c(0.05, 0.1, 0.15)
 
 for (mom in momentums) {
@@ -67,9 +69,9 @@ time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
 ## Binning
 
+cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(), optimizer = OptimizerAGBM$new(mom))
 time_start_agbm = proc.time()
 
-cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(), optimizer = OptimizerAGBM$new(mom))
 temp = lapply(cnames[cnames != "y"], function (feat) {
   cboost_agbm$addBaselearner(feat, "spline", BaselearnerPSpline, df = 5)
 })
