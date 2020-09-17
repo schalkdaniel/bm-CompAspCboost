@@ -4,16 +4,16 @@ source("R/bm-run.R")
 ## Data configurations:
 ## ---------------------------------------------------
 
-#ns = c(5000L, 10000L, 20000L, 50000L, 100000L)
-ns = c(5000L)
-#ps = c(5L, 10L, 20L, 50L)
-ps = c(5L, 10L)
-#pnoise_rel = c(0.5, 1, 2, 5)
-pnoise_rel = c(0.5)
-#sn_ratio = c(0.1, 1, 10)
-sn_ratio = c(1)
-#reps = seq_len(20L)
-reps = seq_len(2L)
+ns = c(5000L, 10000L, 20000L, 50000L, 100000L)
+#ns = c(5000L)
+ps = c(5L, 10L, 20L, 50L)
+#ps = c(5L, 10L)
+pnoise_rel = c(0.5, 1, 2, 5)
+#pnoise_rel = c(0.5)
+sn_ratio = c(0.1, 1, 10)
+#sn_ratio = c(1)
+reps = seq_len(20L)
+#reps = seq_len(2L)
 
 df_configs = expand.grid(n = ns, p = ps, pnoise_rel = pnoise_rel,
   sn_ratio = sn_ratio, rep = reps)
@@ -25,10 +25,7 @@ df_configs$pnoise_rel = NULL
 ## Files of the benchmark scripts:
 ## ---------------------------------------------------
 
-#bm_dirs = paste0("bm-scripts/binning/", c("memory", "runtime",q"performance"))
 #bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
-#bm_dirs = paste0("bm-scripts/categorical/", c("performance"))
-#bm_dirs = paste0("bm-scripts/categorical/", c("memory"))
 bm_dirs = "bm-scripts/optimizer/performance"
 
-runBM(df_configs, bm_dirs)
+runBM(df_configs, bm_dirs, cores = 30L)
