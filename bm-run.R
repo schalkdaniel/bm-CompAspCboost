@@ -26,11 +26,16 @@ df_configs$pnoise_rel = NULL
 ## Files of the benchmark scripts:
 ## ---------------------------------------------------
 
-#bm_dirs = paste0("bm-scripts/binning/", c("memory", "runtime",q"performance"))
 #bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
+<<<<<<< HEAD
+bm_dirs = "bm-scripts/optimizer/performance"
+
+runBM(df_configs, bm_dirs, cores = 30L)
+=======
 #bm_dirs = paste0("bm-scripts/categorical/", c("performance"))
 #bm_dirs = paste0("bm-scripts/categorical/", c("memory"))
 #bm_dirs = "bm-scripts/optimizer/performance"
 bm_dirs = "bm-scripts/optimizer/memory"
 
 runBM(df_configs, bm_dirs, cores = 2L)
+>>>>>>> 607c7f1fd96e7f25b82091551a7eeee00884472e

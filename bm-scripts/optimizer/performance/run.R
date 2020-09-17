@@ -67,7 +67,7 @@ time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
 ## ------------------------------------
 
-## Binning
+## AGBM
 
 cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(), optimizer = OptimizerAGBM$new(mom))
 time_start_agbm = proc.time()
