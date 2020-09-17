@@ -65,7 +65,7 @@ time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
 ## ------------------------------------
 
-## Binning
+## AGBM
 
 time_start_agbm = proc.time()
 
