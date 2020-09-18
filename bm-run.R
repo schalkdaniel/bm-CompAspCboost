@@ -10,11 +10,11 @@ pnoise_rel = c(0.5, 1, 2, 5)
 sn_ratio = c(0.1, 1, 10)
 reps = seq_len(20L)
 
-#ns = 5000L
-#ps = 5L
-#pnoise_rel = c(1, 2)
-#sn_ratio = 1
-#reps = seq_len(20L)
+ns = c(2000L, 5000L)
+ps = 5L
+pnoise_rel = c(1, 2)
+sn_ratio = 1
+reps = seq_len(20L)
 
 df_configs = expand.grid(n = ns, p = ps, pnoise_rel = pnoise_rel,
   sn_ratio = sn_ratio, rep = reps)
@@ -27,7 +27,7 @@ df_configs$pnoise_rel = NULL
 ## ---------------------------------------------------
 
 #bm_dirs = paste0("bm-scripts/binning/", c("runtime", "performance"))
-bm_dirs = "bm-scripts/optimizer/performance"
+bm_dirs = "bm-scripts/optimizer/memory"
 
-runBM(df_configs, bm_dirs, cores = 30L)
+runBM(df_configs, bm_dirs, cores = 15L)
 
