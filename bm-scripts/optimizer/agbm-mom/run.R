@@ -1,21 +1,16 @@
 cargs = commandArgs(trailingOnly=TRUE)
 base_dir = "~/repos/bm-CompAspCboost"
-base_sub_dir = paste0(base_dir, "/bm-scripts/optimizer/performance")
+base_sub_dir = paste0(base_dir, "/bm-scripts/optimizer/agbm-mom")
 config_file = paste0(base_sub_dir, "/config", cargs, ".Rmd")
 
 source(paste0(base_dir, "/R/bm-sim-data.R"))
 source(paste0(base_dir, "/R/bm-run.R"))
 
-config = data.frame(n = 50000L, p = 50, sn_ratio = 1, rep = 1, pnoise = 50)
-
-momentums = c(0.05, 0.1, 0.15)
-
-for (mom in momentums) {
-
 ## Load configuration and paste name of output file
 config = loadConfig(base_sub_dir, cargs)
+mom = config$mom
 
-nm_save = paste0("xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-mom", mom, ".Rda")
+nm_save = paste0("xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-", digest::sha1(mom), ".Rda")
 
 ## Simulate data and create data with noise:
 seed = trunc(config$n / (config$p + config$pnoise) * config$sn_ratio)
@@ -67,7 +62,7 @@ time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
 ## ------------------------------------
 
-## AGBM
+## Binning
 
 cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(), optimizer = OptimizerAGBM$new(mom))
 time_start_agbm = proc.time()
@@ -119,12 +114,3 @@ bm_extract = list(
 
 save(bm_extract, file = paste0(base_sub_dir, "/", nm_save))
 
-}
-
-
-#feat = 10
-
-#gg = cboost_cod$plot(paste0("x", feat, "_spline"))
-
-#df_plot = data.frame(x = dat$sim_poly[[feat]]$x, y = dat$sim_poly[[feat]]$y)
-#gg + ggplot2::geom_point(data = df_plot, ggplot2::aes(x = x, y = y), alpha = 0.5)
