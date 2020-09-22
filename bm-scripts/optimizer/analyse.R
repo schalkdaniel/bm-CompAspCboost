@@ -20,7 +20,7 @@ font_scale = 3
 # Load local data:
 # -------------------
 
-files = list.files("memory")
+files = c(list.files("memory", full.name = TRUE), list.files("../binning/memory", full.name = TRUE))
 files = files[grep("xxx", files)]
 
 ll_rows = list()
@@ -29,22 +29,38 @@ k = 1
 mem_setup = 50
 
 for (fn in files) {
-  load(paste0("memory/", fn))
-  ll_rows[[k]] = data.frame(
-    date        = bm_extract$date,
-    data_seed   = bm_extract$data_seed,
-    nrows       = bm_extract$config$n,
-    ncols       = bm_extract$config$p,
-    sn_ratio    = bm_extract$config$sn_ratio,
-    #rep         = bm_extract$config$rep,    # rep is always 1 for memory
-    ncolsnoise  = bm_extract$config$pnoise,
-    mem         = c(last(bm_extract$ms_extract_nobinning$mem_heap_B), last(bm_extract$ms_extract_binning$mem_heap_B)) - mem_setup,
-    unit        = c(last(bm_extract$ms_extract_nobinning$unit), last(bm_extract$ms_extract_binning$unit)),
-    method      = c("no binning", "binning")
-  )
+  #load(paste0("memory/", fn))
+  load(fn)
+  if (grepl("binning", fn)) {
+    ll_rows[[k]] = data.frame(
+      date        = bm_extract$date,
+      data_seed   = bm_extract$data_seed,
+      nrows       = bm_extract$config$n,
+      ncols       = bm_extract$config$p,
+      sn_ratio    = bm_extract$config$sn_ratio,
+      #rep         = bm_extract$config$rep,    # rep is always 1 for memory
+      ncolsnoise  = bm_extract$config$pnoise,
+      mem         = last(bm_extract$ms_extract_nobinning$mem_heap_B) - mem_setup,
+      unit        = last(bm_extract$ms_extract_nobinning$unit),
+      method      = "COD"
+    )
+  } else {
+    ll_rows[[k]] = data.frame(
+      date        = bm_extract$date,
+      data_seed   = bm_extract$data_seed,
+      nrows       = bm_extract$config$n,
+      ncols       = bm_extract$config$p,
+      sn_ratio    = bm_extract$config$sn_ratio,
+      #rep         = bm_extract$config$rep,    # rep is always 1 for memory
+      ncolsnoise  = bm_extract$config$pnoise,
+      mem         = last(bm_extract$ms_extract_agbm$mem_heap_B) - mem_setup,
+      unit        = last(bm_extract$ms_extract_agbm$unit),
+      method      = "AGBM"
+    )
+  }
   k = k+1
 }
-df_binning_memory = do.call("rbind", ll_rows)
+df_optim_memory = do.call("rbind", ll_rows)
 
 
 # Plot real memory as lines:
@@ -80,12 +96,11 @@ df_binning_memory = do.call("rbind", ll_rows)
 # Plot used memory (proportional):
 # --------------------------------
 
-df_plt_mem = df_binning_memory %>%
-  filter(ncolsnoise == 10) %>%
+df_plt_mem = df_optim_memory %>%
   group_by(nrows, ncols, ncolsnoise, method) %>%
   summarize(mean_mem = median(mem)) %>%
   group_by(nrows, ncolsnoise, ncols) %>%
-  summarize(rel_mem = mean_mem[method == "no binning"] / mean_mem[method == "binning"], ptotal = ncols[1] + ncolsnoise[1])
+  summarize(rel_mem = mean_mem[method == "COD"] / mean_mem[method == "AGBM"], ptotal = ncols[1] + ncolsnoise[1])
 
 df_plt_mem$ptotal = factor(df_plt_mem$ptotal, levels = as.character(sort(unique(df_plt_mem$ptotal))))
 
@@ -131,22 +146,22 @@ for (fn in files) {
     sn_ratio    = bm_extract$config$sn_ratio,
     rep         = bm_extract$config$rep,
     ncolsnoise  = bm_extract$config$pnoise,
-    time_init   = c(bm_extract$time_nobinning["init.elapsed"], bm_extract$time_binning["init.elapsed"]),
-    time_fit   = c(bm_extract$time_nobinning["fit.elapsed"], bm_extract$time_binning["fit.elapsed"]),
-    method      = c("nobinning", "binning")
+    time_init   = c(bm_extract$time_cod["init.elapsed"], bm_extract$time_agbm["init.elapsed"]),
+    time_fit   = c(bm_extract$time_cod["fit.elapsed"], bm_extract$time_agbm["fit.elapsed"]),
+    method      = c("COD", "AGBM")
   )
   k = k+1
 }
-df_binning_runtime = do.call("rbind", ll_rows)
+df_optim_runtime= do.call("rbind", ll_rows)
 
 
-df_plt_run = df_binning_runtime %>%
+df_plt_run = df_optim_runtime %>%
   mutate(time = time_init + time_fit) %>%
   group_by(nrows, ncols, sn_ratio, rep, ncolsnoise) %>%
   summarize(
-    rel_time_init = time_init[method == "nobinning"] / time_init[method == "binning"],
-    rel_time_fit = time_fit[method == "nobinning"] / time_fit[method == "binning"],
-    rel_time = time[method == "nobinning"] / time[method == "binning"],
+    rel_time_init = time_init[method == "COD"] / time_init[method == "AGBM"],
+    rel_time_fit = time_fit[method == "COD"] / time_fit[method == "AGBM"],
+    rel_time = time[method == "COD"] / time[method == "AGBM"],
     ptotal = ncols[1] + ncolsnoise[1]
   ) %>%
   gather(key = "phase", value = "rel_time", starts_with("rel_time"))
@@ -159,7 +174,8 @@ df_plt_run$phase = factor(df_plt_run$phase, levels = c("Initialization + Fitting
 df_plt_run$ptotal = factor(df_plt_run$ptotal, levels = as.character(sort(unique(df_plt_run$ptotal))))
 
 
-gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
+#gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
+gg = ggplot(data = df_plt_run, aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
   geom_hline(yintercept = 1, lty = 2, col = "dark red") +
   geom_violin(alpha = 0.2) +
   theme_minimal(base_family = "Gyre Bonum") +
@@ -183,6 +199,75 @@ gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = a
 
 ## performance
 ## ----------------------------------------------
+
+# Result from finding a good momentum parameter:
+# ----------------------------------------------
+
+
+files = list.files("agbm-mom", full.names = TRUE)
+files = files[grep("xxx", files)]
+
+ll_rows = list()
+k = 1
+
+for (fn in files) {
+  load(fn)
+  ll_rows[[k]] = data.frame(
+    file        = fn,
+    date        = bm_extract$date,
+    data_seed   = bm_extract$data_seed,
+    nrows       = bm_extract$config$n,
+    ncols       = bm_extract$config$p,
+    sn_ratio    = bm_extract$config$sn_ratio,
+    rep         = bm_extract$config$rep,
+    ncolsnoise  = bm_extract$config$pnoise,
+    time_init   = c(bm_extract$time_cod["init.elapsed"], bm_extract$time_agbm["init.elapsed"]),
+    time_fit   = c(bm_extract$time_cod["fit.elapsed"], bm_extract$time_agbm["fit.elapsed"]),
+    method      = c("COD", "AGBM"),
+    iterations  = c(length(bm_extract$log_cod$oob), length(bm_extract$log_agbm$oob)),
+    min_oob     = c(min(bm_extract$log_cod$oob), min(bm_extract$log_agbm$oob)),
+    mom         = bm_extract$momentum
+  )
+  k = k+1
+}
+df_agbm = do.call("rbind", ll_rows)
+#df_agbm$time = df_agbm$time_init + df_agbm$time_fit
+
+df_plt = df_agbm %>%
+  mutate(time = time_init + time_fit) %>%
+  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise, mom) %>%
+  summarize(
+    #rel_time_init = time_init[method == "COD"] / time_init[method == "AGBM"],
+    #rel_time_fit = time_fit[method == "COD"] / time_fit[method == "AGBM"],
+    rel_time = time[method == "COD"] / time[method == "AGBM"],
+    ptotal = ncols[1] + ncolsnoise[1],
+    diffiter = iterations[method == "COD"] - iterations[method == "AGBM"],
+    diffoob  = min_oob[method == "COD"] - min_oob[method == "AGBM"]
+  )
+
+mod_iter = lm(diffiter ~ mom + nrows + ncols + ncolsnoise + as.factor(sn_ratio), data = df_plt)
+summary(mod_iter)
+mod_oob = lm(diffoob ~ mom + nrows + ncols + ncolsnoise  + as.factor(sn_ratio), data = df_plt)
+summary(mod_oob)
+
+df_plt_agbm = df_plt %>%
+  group_by(mom) %>%
+  summarize(
+    m_diffoob = mean(diffoob), sd_diffoob = sd(diffoob), min_diffoob = min(diffoob), max_diffoob = max(diffoob),
+    m_diffiter = mean(diffiter), sd_diffiter = sd(diffiter), min_diffiter = min(diffiter), max_diffiter = max(diffiter)
+  )
+
+df_plt_run$phase[df_plt_run$phase == "rel_time"] = "Initialization + Fitting"
+df_plt_run$phase[df_plt_run$phase == "rel_time_init"] = "Initialization"
+df_plt_run$phase[df_plt_run$phase == "rel_time_fit"] = "Fitting"
+df_plt_run$phase = factor(df_plt_run$phase, levels = c("Initialization + Fitting", "Initialization", "Fitting"))
+
+
+ggplot(data = df_plt_run, aes(x = m_diffoob, y = m_diffiter, color = mom)) +
+  geom_point()
+
+
+
 
 # Load local files:
 # -----------------
