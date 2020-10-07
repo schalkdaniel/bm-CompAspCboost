@@ -1,4 +1,60 @@
-getFeatEffectData = function (bm_extract, bl, truth = TRUE)
+getAllFeatEffectData = function (bm_extract, ndata = 1000L, coef_names = character(0L))
+{
+  checkmate::assertCharacter(x = coef_names, min.len = 1L)
+  if (any(! coef_names %in% names(bm_extract))) stop("coef_names needs to be in bm_extract")
+
+  set.seed(bm_extract$data_seed)
+  dat = simData(bm_extract$config$n, bm_extract$config$p, bm_extract$config$pnoise)
+
+  n = bm_extract$config$n
+  checkmate::assertIntegerish(x = ndata, upper = n, len = 1L, null.ok = TRUE)
+
+  if (is.null(ndata)) ndata = n
+  dat_idx = as.integer(seq(1, n, len = ndata))
+
+  feat = colnames(dat$data)[grepl(pattern = "x", x = colnames(dat$data))]
+  bls = paste0(feat, "_spline")
+
+  out = list()
+  for(bl in bls) {
+    bl_nbr = as.numeric(gsub("\\D", "", bl))
+
+    x = dat$data[[paste0("x", bl_nbr)]][dat_idx]
+    y = dat$sim_poly[[bl_nbr]]$y[dat_idx]
+
+    df_temp = data.frame(x = x, truth = y)
+
+    knots = compboostSplines::createKnots(values = x, n_knots = 20, degree = 3)
+    basis = compboostSplines::createSplineBasis(values = x, degree = 3, knots = knots)
+
+    for (cn in coef_names) {
+      params = bm_extract[[cn]]
+      if (bl %in% names(params)) {
+        param = params[[bl]]
+        pred = basis %*% param
+        df_pred = data.frame(pred)
+      } else {
+        df_pred = data.frame(rep(NA, ndata))
+      }
+      colnames(df_pred) = cn
+      df_temp = cbind(df_temp, df_pred, bl = bl)
+    }
+    out[[bl]] = df_temp
+  }
+  return (out)
+}
+
+getFeatureIME = function (x, truth, pred, loss = function (x,y) (x-y)^2)
+{
+  e = try({
+    f_b = approxfun(x = x, y = loss(truth,pred))
+    int = integrate(f = f_b, upper = max(x), lower = min(x))$value
+  }, silent = TRUE)
+  if (class(e) == "try-error") return (NA) else return (e)
+  return ()
+}
+
+getFeatEffectDataBinning = function (bm_extract, bl, truth = TRUE)
 {
   set.seed(bm_extract$data_seed)
   dat = simData(bm_extract$config$n, bm_extract$config$p, bm_extract$config$pnoise)
