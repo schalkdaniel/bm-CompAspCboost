@@ -9,7 +9,7 @@ source(paste0(base_dir, "/R/bm-run.R"))
 library(compboost)
 
 dfs = c(5, 7, 9)
-bin_roots = c(2, 4, 9)
+bin_roots = c(2.5, 3) #2, 4, 9)
 
 for (df in dfs) {
 for (bin_root in bin_roots) {
@@ -40,7 +40,7 @@ patience = 10L
 
 ## No binning
 
-if (bin_root == 2) {
+if (bin_root == bin_roots[1]) {
   time_start_nobinning = proc.time()
 
   cboost_nobinning = Compboost$new(dat_noise, "y", loss = LossQuadratic$new())
