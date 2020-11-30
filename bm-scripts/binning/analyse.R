@@ -17,10 +17,10 @@ font_scale = 3
 ## memory
 ## ----------------------------------------------
 
-# Load local data:
+# Load data:
 # -------------------
 
-files = list.files("memory")
+files = list.files("memory", full.names = TRUE)
 files = files[grep("xxx", files)]
 
 ll_rows = list()
@@ -29,7 +29,9 @@ k = 1
 mem_setup = 50
 
 for (fn in files) {
-  load(paste0("memory/", fn))
+  load(fn)
+
+  cat("Read", k, "/", length(files), "\n")
 
   set.seed(bm_extract$data_seed)
   dat = simData(bm_extract$config$n, bm_extract$config$p, bm_extract$config$pnoise)
@@ -55,71 +57,6 @@ for (fn in files) {
   k = k+1
 }
 df_binning_memory = do.call("rbind", ll_rows)
-
-
-memSave = function (n, dspline, p, b, n_bl = 1, mem_const = 0, add_fix = FALSE) {
-
-  n_knots = p + dspline - 1
-
-  mem_pen = p^2 * 8 + (n_knots + 2) * 8
-  mem_nob = n * (dspline + 1) * 12 + (p + 3) * 4 + mem_pen
-  #mem_nob = n * (dspline + 1) * 12 + (p + 3) * 4 + mem_pen
-  mem_bin = n^(1/b) * (dspline + 1) * 12 + n * 4 + (p + 3) * 4 + mem_pen
-
-  if (add_fix) {
-    mem_fix_nob = n_bl * p * 8 + n_bl * n * 8 + 4 * n * 8 + n_bl * p * 8 + n_bl * p^2 * 8
-    mem_fix_bin = n_bl * p * 8 + n_bl * n * 8 + 4 * n * 8 + n_bl * p * 8 + n_bl * p^2 * 8
-  } else {
-    mem_fix_nob = mem_fix_bin = 0
-  }
-
-  mem_nob = (n_bl * mem_nob + mem_fix_nob + mem_const) / 1024^2
-  mem_bin = (n_bl * mem_bin + mem_fix_bin + mem_const) / 1024^2
-
-  rel = mem_nob / mem_bin
-  return (c(rel = rel, mem_nob = mem_nob, mem_bin = mem_bin))
-}
-memSave(n = 100000, dspline = 3, p = 24, b = 2, n_bl = 300)
-
-m = memSave(n = 100000, dspline = 3, p = 24, b = 2, n_bl = 300, add_fix = TRUE)
-m
-1869.13 - m["mem_nob"]
-500.54 - m["mem_bin"]
-
-m = memSave(n = 50000, dspline = 3, p = 24, b = 2, n_bl = 100, add_fix = TRUE)
-m
-952.24 - m["mem_nob"]
-268.54 - m["mem_bin"]
-
-
-# Plot real memory as lines:
-# --------------------------
-
-## NOT RELEVANT!!!
-
-#gg = df_binning_memory %>%
-#df_binning_memory %>%
-  #ggplot(aes(x = nrows, y = mem / 1024, color = method)) +
-    #geom_line() +
-    #geom_point() +
-    #theme_minimal(base_family = "Gyre Bonum") +
-    #theme(
-      #strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
-      #strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-      #axis.text.x = element_text(angle = 45, vjust = 0.5),
-      #axis.text = element_text(size = 8 * font_scale),
-      #axis.title = element_text(size = 10 * font_scale)
-    #) +
-    #scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))[-c(1,2)]) +
-    #scale_color_viridis(discrete = TRUE) +
-    #xlab("Number of Rows") +
-    #ylab("Allocated Memory in GB") +
-    #labs(color = "") +
-    #facet_grid(ncolsnoise ~ ncols, scales = "free_y")
-
-#dinA4width = 210 * font_scale
-#ggsave(plot = gg, filename = "memory_lines.pdf", width = dinA4width * 2/3 * 0.6, height = dinA4width * 2/3, units = "mm")
-
 
 
 # Plot used memory (proportional):
@@ -148,15 +85,16 @@ gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group
     legend.text = element_text(size = 6 * font_scale),
     legend.title = element_text(size = 8 * font_scale)
   ) +
-  scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows))) +
+  scale_x_continuous(breaks = sort(unique(df_binning_memory$nrows)), trans = "log10") +
+  scale_y_continuous(breaks = c(1, 2, 4, 6)) +
   scale_color_viridis(discrete = TRUE) +
-  xlab("Number of Rows") +
-  ylab("Relative Allocated Memory") +
-  labs(color = "Number of\nFeatures") #+
-  #facet_grid(. ~ ncols, scales = "free_y")
+  xlab("Number of Rows\n(log10 Scale)") +
+  ylab("Relative improvement of\nallocated memory\nMem(No Binning) / Mem(Binning)") +
+  labs(color = "Number of\nFeatures") +
+  annotate("text", x = max(df_plt_mem$nrows), y = 1, label = "Baseline (used memory is equal)", color = "dark red", vjust = 1.5, hjust = 1)
 
-#dinA4width = 210 * font_scale
-#ggsave(plot = gg, filename = "memory_rel_lines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.7, units = "mm")
+dinA4width = 210 * font_scale
+ggsave(plot = gg, filename = "binning_memory_rel_lines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.7, units = "mm")
 
 tmp = df_binning_memory %>%
   group_by(nrows, ncols, ncolsnoise, method) %>%
@@ -178,14 +116,15 @@ knitr::kable(round(tmp, 2), format = "latex")
 ## runtime
 ## ----------------------------------------------
 
-files = list.files("runtime")
+files = list.files("runtime", full.names = TRUE)
 files = files[grep("xxx", files)]
 
 ll_rows = list()
 k = 1
 
 for (fn in files) {
-  load(paste0("runtime/", fn))
+  load(fn)
+  cat("Read", k, "/", length(files), "\n")
   ll_rows[[k]] = data.frame(
     date        = bm_extract$date,
     data_seed   = bm_extract$data_seed,
@@ -222,9 +161,9 @@ df_plt_run$phase = factor(df_plt_run$phase, levels = c("Initialization + Fitting
 df_plt_run$ptotal = factor(df_plt_run$ptotal, levels = as.character(sort(unique(df_plt_run$ptotal))))
 
 
-gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal))) +
+gg = ggplot() +
   geom_hline(yintercept = 1, lty = 2, col = "dark red") +
-  geom_violin(alpha = 0.2) +
+  geom_violin(data = df_plt_run %>% filter(rel_time < 10, rel_time > 2, phase == "Fitting"), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal)), alpha = 0.2) +
   theme_minimal(base_family = "Gyre Bonum") +
   theme(
     strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
@@ -238,13 +177,18 @@ gg = ggplot(data = df_plt_run %>% filter(rel_time < 10, rel_time > 1), aes(x = a
   ) +
   scale_color_viridis(discrete=TRUE) +
   scale_fill_viridis(discrete=TRUE) +
-  xlab("Number of Rows") +
-  ylab("Relative Speedup") +
+  xlab("Number of Rows\n(log10 Scale)") +
+  ylab("Speedup\nTime(No Binning) / Time(Binning)") +
   labs(color = "Number of\nFeatures", fill = "Number of\nFeatures") +
-  facet_grid(. ~ phase, scales = "free_y")
+  scale_y_continuous(breaks = c(1, 2, 4, 6)) +
+  geom_text(data = data.frame(x = 6, y = 1, label = "Baseline (runtime is equal)", phase = "Initialization + Fitting", ptotal = 250),
+    aes(x = x, y = y, label = label), color = "dark red", vjust = 1.5, hjust = 1, show.legend = FALSE)
+  #facet_grid(. ~ factor(phase, levels = c("Initialization", "Fitting", "Initialization + Fitting")), scales = "free_y")
 
-#dinA4width = 210 * font_scale
-#ggsave(plot = gg, filename = "runtime_rel_violines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.5, units = "mm")
+dinA4width = 210 * font_scale
+scale_fac = 2/3
+#scale_fac = 0.5
+ggsave(plot = gg, filename = "binning_runtime_rel_violines.pdf", width = dinA4width * scale_fac, height = dinA4width * 0.8 * scale_fac, units = "mm")
 
 
 tmp = df_binning_runtime %>%
@@ -268,126 +212,6 @@ knitr::kable(round(tmp, 2), format = "latex")
 
 ## performance
 ## ----------------------------------------------
-
-# Load local files:
-# -----------------
-
-files = list.files("performance")
-files = files[grep("xxx", files)]
-
-ll_rows = list()
-k = 1
-
-#for (fn in files) {
-  #load(paste0("performance/", fn))
-  #e = try(expr = {
-    #bl_mses = getBLMSE(bm_extract)
-    #data.frame(
-      #file        = fn,
-      #date        = bm_extract$date,
-      #data_seed   = bm_extract$data_seed,
-      #nrows       = bm_extract$config$n,
-      #ncols       = bm_extract$config$p,
-      #sn_ratio    = bm_extract$config$sn_ratio,
-      #rep         = bm_extract$config$rep,
-      #ncolsnoise  = bm_extract$config$pnoise,
-      #time_init   = c(bm_extract$time_nobinning["init.elapsed"], bm_extract$time_binning["init.elapsed"]),
-      #time_fit   = c(bm_extract$time_nobinning["fit.elapsed"], bm_extract$time_binning["fit.elapsed"]),
-      #method      = c("nobinning", "binning"),
-      #bl_mse      = unlist(bl_mses)
-    #)}, silent = TRUE
-  #)
-
-  #if (class(e) == "try-error") cat(paste0(k, " - ", fn, ": ", e)) else ll_rows[[k]] = e
-  #k = k+1
-#}
-load("ll_rows_performance.Rda")
-df_binning_performance = do.call("rbind", ll_rows)
-
-# Boxplot of base-learner mses:
-# -----------------------------
-
-
-p = ggboxplot(df_binning_performance, x = "nrows", y = "bl_mse",
-  color = "method", palette = c("#00AFBB", "#E7B800", "#FC4E07"),
-  add = "jitter", shape = "method")
-
-my_comparisons = list( c("nobinning", "binning"))
-p = p + stat_compare_means(comparisons = my_comparisons) + # Add pairwise comparisons p-value
-  stat_compare_means(label.y = 50)                   # Add global p-value
-
-facet(p, facet.by = c("ncolsnoise", "ncols"),
-      short.panel.labs = FALSE)
-
-
-
-# Visualize one base-learner of a specific setting:
-# -------------------------------------------------
-
-# Here the setting 100:
-fn = files[100]
-load(paste0("performance/", fn))
-
-# choose base-learner for visualization:
-bl_tab = table(bm_extract$trace_binning)
-bl = "x9_spline"
-
-coefs_binning = bm_extract$coef_binning[[bl]]
-coefs_nobinning = bm_extract$coef_nobinning[[bl]]
-
-mean((coefs_binning - coefs_nobinning)^2)
-
-# Plot estimated effect vs truth:
-df_plot = getFeatEffectData(bm_extract,bl)
-ggplot(data = df_plot, aes(x = x, y = y, color = method)) + geom_line()
-
-# Oob risk of binning vs nobinning:
-df_risk = getOobRiskData(bm_extract)
-ggplot(data = df_risk, aes(x = iter, y = risk, color = method, linetype = method)) + geom_line()
-
-
-# Plot estimated effect over the 20 replications:
-fn_pre = "xxx-n50000-p50-pnoise50-snr1-"
-files_fix = grep(fn_pre, files)
-bl = "x7_spline"
-
-load(paste0("performance/", files[files_fix[1]]))
-df_base = getFeatEffectData(bm_extract, bl, TRUE)
-
-set.seed(bm_extract$data_seed * bm_extract$config$rep)
-df_base$ynoise = rnorm(n = bm_extract$config$n, mean = df_base$y, sd = sd(df_base$y) / bm_extract$config$sn_ratio)
-
-ll_effect = list()
-k = 1
-for (fn in files_fix) {
-  load(paste0("performance/", files[fn]))
-  ll_effect[[k]] = getFeatEffectData(bm_extract, bl, FALSE)
-  ll_effect[[k]]$rep = k
-  k = k + 1
-}
-
-gg = ggplot() +
-  geom_line(data = df_base %>% filter(method == "truth"), aes(x = x, y = y), color = "dark red")
-
-for (efct in ll_effect) {
-  gg = gg + geom_line(data = efct, aes(x = x, y = y, color = method), alpha = 0.2)
-}
-gg + scale_color_viridis(discrete = TRUE)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Performance: Visualize one setting:
 files = list.files("performance", full.names = TRUE)
@@ -422,17 +246,20 @@ df_fe$line[df_fe$line == "coef_nobinning"] = "No Binning"
 
 
 gg = ggplot(df_fe, aes(x = x, y = y, color = line)) +
-  geom_line() +
+  geom_line(lwd = 2) +
   #scale_color_viridis(discrete = TRUE) +
   theme_minimal(base_family = "Gyre Bonum") +
   scale_color_brewer(palette = "Set1") +
-  theme(
-    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white")  ,
-    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
-    axis.text.x = element_text(angle = 45, vjust = 0.5),
-    axis.text = element_text(size = 8 * font_scale),
-    axis.title = element_text(size = 10 * font_scale)
-  ) +
+    theme(
+      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white")  ,
+      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+      axis.title = element_text(size = 10 * font_scale),
+      legend.text = element_text(size = 8 * font_scale),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank()
+    ) +
   xlab("Feature Value") +
   ylab("Estimated Feature Effect") +
   labs(color = "") +
@@ -441,52 +268,13 @@ gg = ggplot(df_fe, aes(x = x, y = y, color = line)) +
   ggtitle(paste0("Rows: ", bm_extract$config$n, " SNR: ", bm_extract$config$sn_ratio))
 
 dinA4width = 210 * font_scale
-ggsave(plot = gg, filename = "performance_effects1.pdf", width = dinA4width, height = dinA4width, units = "mm")
+ggsave(plot = gg, filename = "binning_performance_effects1.pdf", width = dinA4width, height = dinA4width, units = "mm")
 
 
 
 
-
-
-
-
-coef_names = paste0("coef_", c("cod", "agbm"))
-feat_effects = getAllFeatEffectData(bm_extract, ndata = bm_extract$config$n / 4,  coef_names = coef_names)
-
-ll_imse = lapply(feat_effects, function (df) {
-  df %>%
-    pivot_longer(cols = coef_names, names_to = "optimizer", values_to = "effect") %>%
-    group_by(optimizer) %>%
-    mutate(y = effect - mean(effect), truth = truth - mean(truth)) %>%
-    arrange(optimizer, x)
-})
-df_imse = do.call(rbind, ll_imse)
-
-df_imse_agg = df_imse %>%
-  group_by(bl, optimizer) %>%
-  summarize(
-    mse = mean((truth - y)^2),
-    imse = getFeatureIME(x = x, truth = truth, pred = y),
-    mae = mean(abs(truth - y)),
-    imae = getFeatureIME(x = x, truth = truth, pred = y, loss = function (f,y) abs(f - y))
-  ) %>%
-  group_by(optimizer) %>%
-  summarize(
-    mmse = mean(mse),
-    mimse = mean(imse),
-    mmae = mean(mae),
-    mimae = mean(imae)
-  )
-
-df_imse_agg
-
-
-
-
-
-
-
-
+## Calculate mean integrated squared error and visualize:
+## ----------------------------------------------------------
 
 files = list.files("performance", full.names = TRUE)
 files = files[grep("xxx", files)]
@@ -555,24 +343,10 @@ load("ll_rows_performance_measures.Rda")
 df_imse = do.call(rbind, ll_rows)
 df_imse
 
-df_imse = df_imse %>%
-  mutate(
-    method_n = ifelse(method == "Binning", paste0(method, " ", bin_root), method),
-    ptotal = ncols + ncolsnoise
-  )
-
-gg = df_imse %>%
+df_imse %>%
+  mutate(method_n = ifelse(method == "Binning", paste0(method, " ", bin_root), method)) %>%
   filter(bin_root != 9) %>%
-  group_by(nrows, ncols, sn_ratio, rep, ncolsnoise, df) %>%
-  summarize(
-    rel_bin2 = mimse[method_n == "No Binning"][1] / mimse[method_n == "Binning 2"],
-    rel_bin4 = mimse[method_n == "No Binning"][1] / mimse[method_n == "Binning 4"]
-  ) %>%
-  pivot_longer(cols = starts_with("rel_bin"), names_to = "bin_root", values_to = "rel") %>%
-  mutate(method_n = ifelse(bin_root == "rel_bin2", "2", "4")) %>%
-
-  ggplot(aes(x = as.factor(nrows), y = rel, fill = method_n, color = method_n)) +
-    geom_hline(yintercept = 1, color = "dark red", linetype = "dashed") +
+  ggplot(aes(x = as.factor(nrows), y = mimse, fill = method_n, color = method_n)) +
     geom_boxplot(alpha = 0.5) +
     theme_minimal(base_family = "Gyre Bonum") +
     theme(
@@ -583,19 +357,18 @@ gg = df_imse %>%
       axis.title = element_text(size = 10 * font_scale),
       legend.text = element_text(size = 6 * font_scale),
       legend.title = element_text(size = 8 * font_scale),
-      panel.grid.major.x = element_blank()
-    ) +
-    #scale_color_viridis(discrete = TRUE) +
-    #scale_fill_viridis(discrete = TRUE) +
-    scale_color_brewer(palette = "Set1") +
-    scale_fill_brewer(palette = "Set1") +
-    xlab("Number of Rows") +
-    ylab("Relative Deviation of the\nMean Integrated Squared Error\nCompared No Binning") +
-    labs(color = "Binning Root", fill = "Binning Root") +
-    facet_grid(paste0("SNR = ", sn_ratio) ~ paste0("df = ", df), scales = "free_y")
+    panel.grid.major.x = element_blank()
+  ) +
+  scale_color_viridis(discrete = TRUE) +
+  scale_fill_viridis(discrete = TRUE) +
+  xlab("Number of Rows") +
+  ylab("Mean Integrated Squared Error") +
+  labs(color = "", fill = "") +
+  facet_grid(paste0("SNR = ", sn_ratio) ~ paste0("df = ", df), scales = "free_y")
+
 
 dinA4width = 210 * font_scale
-ggsave(plot = gg, filename = "performance_boxplots_rel.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.6, units = "mm")
+ggsave(plot = gg, filename = "binning_performance_boxplots.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.6, units = "mm")
 
 
 
