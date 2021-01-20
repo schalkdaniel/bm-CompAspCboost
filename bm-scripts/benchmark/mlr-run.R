@@ -29,8 +29,8 @@ if (test) {
 #measures = msrs(list("classif.auc", "classif.ce", "classif.mbrier"))
 measure = msr("classif.auc")
 
-source(paste0(bm_dir, "param-sets.R"))
 source(paste0(bm_dir, "tasks.R"))
+source(paste0(bm_dir, "param-sets.R"))
 source(paste0(bm_dir, "learners.R"))
 source(paste0(bm_dir, "design.R"))
 
@@ -43,3 +43,6 @@ time = proc.time()
 bmr = benchmark(design)
 time = proc.time() - time
 bmr$aggregate()
+
+
+save(bmr, file = "bmr.Rda")

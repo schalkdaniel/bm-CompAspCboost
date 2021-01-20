@@ -544,6 +544,7 @@ files = files[grep("xxx", files)]
 ll_rows = list()
 k = 1
 
+#for (fn in sample(files, 200, FALSE)) {
 for (fn in files) {
   cat(as.character(Sys.time()), "Read: ", k , "/", length(files), "\n")
 
@@ -559,13 +560,43 @@ for (fn in files) {
   est_params = bm_extract$coef_ridge[[2]]
   names(est_params) = vapply(names(est_params), FUN.VALUE = character(1L), FUN = function (nm) strsplit(nm, split = "_")[[1]][1])
   est_params = transformRidgeToParam(est_params, dat$data)
+
   mse_ridge = getNoiseMSE(real_params, est_params, FALSE)
   mse_ridge_wn = getNoiseMSE(real_params, est_params, TRUE)
+  mse_ridge_just_wn = getNoiseMSE(real_params, est_params, TRUE, TRUE)
+
+  ridge_cutoff = 0.01
+  est_params_ridge_cutoff001 = lapply(est_params, function (p) {
+    p$means = ifelse (abs(p$means) > ridge_cutoff, p$means, 0)
+    p
+  })
+  mse_ridge_cutoff001 = getNoiseMSE(real_params, est_params_ridge_cutoff001, FALSE)
+  mse_ridge_wn_cutoff001 = getNoiseMSE(real_params, est_params_ridge_cutoff001, TRUE)
+  mse_ridge_just_wn_cutoff001 = getNoiseMSE(real_params, est_params_ridge_cutoff001, TRUE, TRUE)
+
+  ridge_cutoff = 0.5
+  est_params_ridge_cutoff05 = lapply(est_params, function (p) {
+    p$means = ifelse (abs(p$means) > ridge_cutoff, p$means, 0)
+    p
+  })
+  mse_ridge_cutoff05 = getNoiseMSE(real_params, est_params_ridge_cutoff05, FALSE)
+  mse_ridge_wn_cutoff05 = getNoiseMSE(real_params, est_params_ridge_cutoff05, TRUE)
+  mse_ridge_just_wn_cutoff05 = getNoiseMSE(real_params, est_params_ridge_cutoff05, TRUE, TRUE)
+
+  ridge_cutoff = 1
+  est_params_ridge_cutoff1 = lapply(est_params, function (p) {
+    p$means = ifelse (abs(p$means) > ridge_cutoff, p$means, 0)
+    p
+  })
+  mse_ridge_cutoff1 = getNoiseMSE(real_params, est_params_ridge_cutoff1, FALSE)
+  mse_ridge_wn_cutoff1 = getNoiseMSE(real_params, est_params_ridge_cutoff1, TRUE)
+  mse_ridge_just_wn_cutoff1 = getNoiseMSE(real_params, est_params_ridge_cutoff1, TRUE, TRUE)
 
   est_params = bm_extract$coef_binary[[2]]
   est_params = transformBinaryToParam(est_params)
   mse_binary = getNoiseMSE(real_params, est_params, FALSE)
   mse_binary_wn = getNoiseMSE(real_params, est_params, TRUE)
+  mse_binary_just_wn = getNoiseMSE(real_params, est_params, TRUE, TRUE)
 
   ll_rows[[k]] = data.frame(
     date        = bm_extract$date,
@@ -577,53 +608,178 @@ for (fn in files) {
     ncolsnoise  = bm_extract$config$pnoise,
     nclasses    = bm_extract$config_classes$ncls[1],
     nnoninfocls = bm_extract$config_classes["nic"][1,1],
-    time_init   = c(bm_extract$time_binary["init.elapsed"], bm_extract$time_ridge["init.elapsed"]),
-    time_fit   = c(bm_extract$time_binary["fit.elapsed"], bm_extract$time_ridge["fit.elapsed"]),
-    method      = c("binary", "ridge"),
-    noninfo_mse  = c(mse_binary$mean, mse_ridge$mean),
-    noninfo_mse_wn = c(mse_binary_wn$mean, mse_ridge_wn$mean),
-    nnotselected = c(mse_binary$n_not_sel, mse_ridge$n_not_sel)
+    time_init   = c(bm_extract$time_binary["init.elapsed"], rep(bm_extract$time_ridge["init.elapsed"], 4)),
+    time_fit   = c(bm_extract$time_binary["fit.elapsed"], rep(bm_extract$time_ridge["fit.elapsed"], 4)),
+    method      = c("binary", "ridge", "ridge_cutoff001", "ridge_cutoff05", "ridge_cutoff1"),
+    mse = c(mse_binary_wn$mean, mse_ridge_wn$mean, mse_ridge_wn_cutoff001$mean, mse_ridge_wn_cutoff05$mean, mse_ridge_wn_cutoff1$mean),
+    mse_with_noise  = c(mse_binary$mean, mse_ridge$mean, mse_ridge_cutoff001$mean, mse_ridge_cutoff05$mean, mse_ridge_cutoff1$mean),
+    mse_noise = c(mse_binary_just_wn$mean, mse_ridge_just_wn$mean, mse_ridge_just_wn_cutoff001$mean, mse_ridge_just_wn_cutoff05$mean, mse_ridge_just_wn_cutoff1$mean),
+    nnotselected = c(mse_binary$n_not_sel, mse_ridge$n_not_sel, mse_ridge_cutoff001$n_not_sel, mse_ridge_cutoff05$n_not_sel, mse_ridge_cutoff1$n_not_sel),
+    nwrongnotselected = c(mse_binary$n_wrong_not_sel, mse_ridge$n_wrong_not_sel, mse_ridge_cutoff001$n_wrong_not_sel, mse_ridge_cutoff05$n_wrong_not_sel, mse_ridge_cutoff1$n_wrong_not_sel)
   )
-  k = k+1
   }
+  k = k+1
 }
-save(ll_rows, file = "ll_rows_cat_mses.Rda")
-load("ll_rows_cat_mses.Rda")
+save(ll_rows, file = "ll_rows_cat_mses2.Rda")
+load("ll_rows_cat_mses2.Rda")
 
 df_cat_mses = do.call(rbind, ll_rows)
 
+df_cat_mses$method = factor(df_cat_mses$method)
+levels(df_cat_mses$method) = c("Binary", "Ridge", "Ridge (cutoff <0.01)", "Ridge (cutoff <0.5)", "Ridge (cutoff <1)")
+
+df_bp = df_cat_mses %>%
+  pivot_longer(cols = starts_with("mse")) %>%
+  mutate(sn_ratiof = factor(paste0("SNR: ", sn_ratio), levels = paste0("SNR: ", c(0.1, 1, 10)))) %>%
+  mutate(mse = factor(name))
+
+levels(df_bp$mse) = c("MSE", "MSE of\nnoise classes", "MSE of\ninformative classes")
+
+gg = df_bp %>%
+  ggplot(aes(x = mse, y = value, fill = method, color = method)) +
+    geom_boxplot(alpha = 0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    scale_color_viridis(discrete = TRUE) +
+    xlab("") +
+    ylab("MSE") +
+    labs(fill = "", color = "", shape = "") +
+    theme_minimal(base_family = "Gyre Bonum") +
+    theme(
+      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+      axis.text.x = element_text(angle = 45, vjust = 0.5),
+      axis.text = element_text(size = 8 * font_scale),
+      axis.title = element_text(size = 10 * font_scale),
+      legend.text = element_text(size = 6 * font_scale),
+      legend.title = element_text(size = 8 * font_scale)
+    ) +
+    facet_grid(sn_ratiof ~ .) #, scales = "free_y")
+
+dinA4width = 210 * font_scale
+ggsave(plot = gg, filename = "categorical_mse.pdf", width = dinA4width * 2/3 * 0.7, height = dinA4width * 2/3 * 0.5, units = "mm")
+
+head(df_cat_mses)
+
+df_plt_cat_mses = df_cat_mses %>%
+  mutate(
+    rel_notselected = nnotselected / nnoninfocls,
+    rel_nwrongnotselected = nwrongnotselected / nnoninfocls
+  ) %>%
+  group_by(nrows, ncols, ncolsnoise, method, nclasses, sn_ratio) %>%
+  summarize(
+    rel_notselected = median(rel_notselected, na.rm = TRUE),
+    rel_nwrongnotselected = median(rel_nwrongnotselected, na.rm = TRUE)
+  ) %>%
+  mutate(
+    sn_ratiof = factor(paste0("SNR: ", sn_ratio), levels = paste0("SNR: ", c(0.1, 1, 10)))
+  )
+
+dim(df_plt_cat_mses)
+
+#hull = df_cat_mses %>%
+  #mutate(
+    #rel_notselected = nnotselected / nnoninfocls,
+    #rel_nwrongnotselected = nwrongnotselected / nnoninfocls,
+    #sn_ratiof = factor(paste0("SNR: ", sn_ratio), levels = paste0("SNR: ", c(0.1, 1, 10)))
+  #) %>%
+  #filter(!is.nan(rel_nwrongnotselected), !is.nan(rel_notselected)) %>%
+  #group_by(sn_ratiof, method) %>%
+  #slice(chull(rel_nwrongnotselected, rel_notselected))
 
 
-### How many noise categories where selected:
-df_cat_mses %>%
-  ggplot(aes(x = factor(nrows), y = nnotselected, fill = method)) +
-    geom_boxplot() +
-    facet_grid(sn_ratio ~ nclasses, scales = "free_y")
+#hull = df_plt_cat_mses %>%
+  filter(!is.nan(rel_nwrongnotselected), !is.nan(rel_notselected)) %>%
+  #group_by(sn_ratiof, method) %>%
+  #slice(chull(rel_nwrongnotselected, rel_notselected))
+
+tmp = df_cat_mses %>%
+  filter(method %in% c("Binary", "Ridge (cutoff <0.5)", "Ridge (cutoff <1)")) %>%
+  mutate(
+    rel_notselected = nnotselected / nnoninfocls,
+    rel_nwrongnotselected = nwrongnotselected / nnoninfocls,
+    sn_ratiof = factor(paste0("SNR: ", sn_ratio), levels = paste0("SNR: ", c(0.1, 1, 10)))
+  ) %>%
+  group_by(nrows, ncols, ncolsnoise, method, nclasses, sn_ratiof) %>%
+  summarize(
+    rel_notselected = median(rel_notselected, na.rm = TRUE),
+    rel_nwrongnotselected = median(rel_nwrongnotselected, na.rm = TRUE)
+  ) %>%
+  select(rel_nwrongnotselected, rel_notselected, method, sn_ratiof) %>%
+  filter(is.finite(rel_nwrongnotselected), is.finite(rel_notselected), rel_nwrongnotselected > 0, rel_notselected > 0) %>%
+  na.omit()
+
+ll_dens = list()
+k = 1
+for (m in unique(tmp$method)) {
+  for (snr in unique(tmp$sn_ratiof)) {
+    kd = ks::kde(tmp[(tmp$method == m) & (tmp$sn_ratiof == snr), c("rel_nwrongnotselected", "rel_notselected")],
+           compute.cont=TRUE)
+    kd = ks::kde(tmp[(tmp$method == m) & (tmp$sn_ratiof == snr), c("rel_nwrongnotselected", "rel_notselected")],
+           compute.cont=TRUE, H = kd$H * 2)
+    cont = with(kd, contourLines(x=eval.points[[1]], y=eval.points[[2]],
+      z=estimate, levels=cont["5%"])[[1]], bgridsize=c(151,151))
+    ll_dens[[k]] = data.frame(cont, method = m, sn_ratiof = snr)
+    ll_dens[[k]]$rel_nwrongnotselected = ll_dens[[k]]$x
+    ll_dens[[k]]$rel_notselected = ll_dens[[k]]$y
+    k = k + 1
+  }
+}
+df_dens = do.call(rbind, ll_dens)
+
+gg = ggplot(mapping = aes(x = rel_nwrongnotselected, y = rel_notselected, shape = method, color = method, fill = method)) +
+#ggplot(mapping = aes(x = rel_nwrongnotselected, y = rel_notselected, shape = method, color = method, fill = method)) +
+  geom_polygon(data = df_dens, alpha = 0.2, size = 0.1) +
+  geom_point(data = df_plt_cat_mses) +
+  scale_fill_viridis(discrete = TRUE) +
+  scale_color_viridis(discrete = TRUE) +
+  xlab("Fraction of wrongly\nnot selected classes (FPR)") +
+  ylab("Fraction of correctly\nnot selected classes (TPR)") +
+  labs(fill = "", color = "", shape = "") +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale),
+    legend.text = element_text(size = 6 * font_scale),
+    legend.title = element_text(size = 8 * font_scale)
+  ) +
+  xlim(min(df_dens$rel_nwrongnotselected), max(df_dens$rel_nwrongnotselected)) +
+  ylim(min(df_dens$rel_notselected), max(df_dens$rel_notselected)) +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2)) +
+  facet_grid(sn_ratiof ~ .)#, scales = "free_y")
+
+dinA4width = 210 * font_scale
+ggsave(plot = gg, filename = "categorical_noninfo_count.pdf", width = dinA4width * 2/3 * 0.7, height = dinA4width * 2/3 * 0.5, units = "mm")
+
 
 
 gg_cat_selected = df_cat_mses %>%
-  group_by(nrows, ncols,  method, nclasses, sn_ratio) %>%
+#df_cat_mses %>%
+  group_by(nrows, method, nclasses, sn_ratio) %>%
   summarize(
     rel = median(nnotselected, na.rm = TRUE),
     min_rel = median(nnotselected, na.rm = TRUE) - sd(nnotselected, na.rm = TRUE),
-    max_rel = median(nnotselected, na.rm = TRUE) + sd(nnotselected, na.rm = TRUE),
-    pn_rel = ncolsnoise[1] / ncols[1],
+    max_rel = median(nnotselected, na.rm = TRUE) + sd(nnotselected, na.rm = TRUE)
+    #pn_rel = ncolsnoise[1] / ncols[1],
   ) %>%
   mutate(
-    pn_rel = ifelse(pn_rel == 0.4, 0.5, pn_rel),
-    ncolsf = factor(paste0("# p: ", ncols), levels = paste0("# p: ", c(5, 10, 20, 50))),
+    #pn_rel = ifelse(pn_rel == 0.4, 0.5, pn_rel),
+    #ncolsf = factor(paste0("# p: ", ncols), levels = paste0("# p: ", c(5, 10, 20, 50))),
     sn_ratiof = factor(paste0("SNR: ", sn_ratio), levels = paste0("SNR: ", c(0.1, 1, 10)))
   ) %>%
   #filter(ncols == 50, nclasses == 20) %>%
-    ggplot(aes(x = nrows, y = rel, linetype = as.factor(method), color = as.factor(nclasses))) +
-      geom_linerange(aes(ymin = min_rel, ymax = max_rel), alpha = 0.5, position = position_dodge(width = 0.05)) +
+    ggplot(aes(x = nrows, y = rel / nclasses * 2, linetype = as.factor(method), color = as.factor(nclasses))) +
+      geom_linerange(aes(ymin = min_rel / nclasses * 2, ymax = max_rel / nclasses * 2), alpha = 0.5, position = position_dodge(width = 0.05)) +
       geom_line(position = position_dodge(width = 0.05)) +
       #scale_fill_viridis(discrete = TRUE) +
       #scale_color_viridis(discrete = TRUE) +
       scale_color_brewer(palette = "Set1") +
-      xlab("Number of Rows\n(log10 Scale)") +
-      ylab("Number of Not Selected\nNon-Informative Classes") +
-      labs(linetype = "Method", fill = "Method", color = "Number of Classes\nper Feature") +
+      xlab("Number of rows\n(log10 Scale)") +
+      ylab("Fraction of not selected\nnon-informative classes") +
+      labs(linetype = "Method", fill = "Method", color = "Number of classes\nper feature") +
       theme_minimal(base_family = "Gyre Bonum") +
       theme(
         strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
@@ -635,7 +791,7 @@ gg_cat_selected = df_cat_mses %>%
         legend.title = element_text(size = 8 * font_scale)
       ) +
       scale_x_continuous(breaks = unique(df_cat_mses$nrows), trans = "log10") +
-      facet_grid(sn_ratiof ~ ncolsf)#, scales = "free_y")
+      facet_grid(sn_ratiof ~ .)#, scales = "free_y")
 
 dinA4width = 210 * font_scale
 ggsave(plot = gg_cat_selected, filename = "categorical_noninfo_count.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.6, units = "mm")

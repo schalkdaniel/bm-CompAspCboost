@@ -175,9 +175,11 @@ getBLMSE = function (bm_extract)
 
 
 
-plotBlearnerTraces = function (bl, value = 1, n_legend = 5L)
+plotBlearnerTraces = function (bl, value = 1, n_legend = 5L, iter_limit = NULL, show_labels = TRUE, show_last_point = FALSE)
 {
-  bl = as.factor(bl)
+  nbl = length(bl)
+  if (is.null(iter_limit)) iter_limit = nbl
+  bl = as.factor(bl[seq_len(iter_limit)])
   df_plot  = data.frame(iters = seq_along(bl), blearner = bl, value = value)
 
   if (length(value) %in% c(1L, length(bl))) {
@@ -191,7 +193,7 @@ plotBlearnerTraces = function (bl, value = 1, n_legend = 5L)
   df_plot = do.call(rbind, lapply(X = levels(bl), FUN = function (lab) {
     df_temp = df_plot[df_plot$blearner == lab, ]
     df_temp = df_temp[order(df_temp$iters), ]
-    df_temp$value = cumsum(df_temp$value) / length(bl)
+    df_temp$value = cumsum(df_temp$value) / nbl
 
     return(df_temp)
   }))
@@ -215,13 +217,22 @@ plotBlearnerTraces = function (bl, value = 1, n_legend = 5L)
 
   gg = ggplot2::ggplot() +
     ggplot2::geom_line(data = df_plot_top, ggplot2::aes(x = iters, y = value, color = blearner), show.legend = FALSE) +
-    ggplot2::geom_line(data = df_plot_nottop, ggplot2::aes(x = iters, y = value, group = blearner), alpha = 0.2, show.legend = FALSE) +
-    ggrepel::geom_label_repel(data = df_label, ggplot2::aes(x = iters, y = value, label = round(value, 4), fill = blearner),
-      colour = "white", fontface = "bold", show.legend = TRUE) +
-    ggplot2::xlab("Iteration") +
+    ggplot2::geom_line(data = df_plot_nottop, ggplot2::aes(x = iters, y = value, group = blearner), alpha = 0.2, show.legend = FALSE)
+
+  if (show_last_point) {
+    gg = gg + geom_point(data = df_plot_top %>% filter(iters == iter_limit), aes(x = iters, y = value, color = blearner), show.legend = FALSE) +
+      geom_point(data = df_plot_nottop %>% filter(iters == iter_limit), aes(x = iters, y = value, group = blearner), alpha = 0.2,  show.legend = FALSE)
+  }
+
+  if (show_labels) {
+    gg = gg + ggrepel::geom_label_repel(data = df_label, ggplot2::aes(x = iters, y = value, label = round(value, 4), fill = blearner),
+      colour = "white", fontface = "bold", show.legend = TRUE)
+  }
+  gg = gg + ggplot2::xlab("Iteration") +
     ggplot2::ylab("Cumulated Value\nof Included Base-Learner") +
     ggplot2::scale_fill_discrete(name = paste0("Top ", n_legend, " Base-Learner")) +
-    ggplot2::guides(color = FALSE)
+    ggplot2::guides(color = FALSE) +
+    ggplot2::xlim(0, nbl)
 
   return(gg)
 }
@@ -262,7 +273,7 @@ transformRidgeToParam = function (est_params, data)
   return (out)
 }
 
-getNoiseMSE = function (real_params, est_params, include_noise = TRUE)
+getNoiseMSE = function (real_params, est_params, include_noise = TRUE, just_noise = FALSE)
 {
   names(real_params) = paste0("xx", seq_along(real_params))
   out = lapply(names(est_params), function (pn) {
@@ -280,10 +291,22 @@ getNoiseMSE = function (real_params, est_params, include_noise = TRUE)
       real = real_params[[pn]]
       idx_zeros = real$param$means == 0
       tmp = dplyr::left_join(real$param, params, by = "cls")
+      if (any(is.na(tmp$means.y))) { tmp$means.y = ifelse(is.na(tmp$means.y), 0, tmp$means.y)}
       out = (tmp$means.x - tmp$means.y)^2
-      mout = mean(out[idx_zeros], na.rm = TRUE)
+
+      if (just_noise) {
+        mout = mean(out[idx_zeros], na.rm = TRUE)
+      } else {
+        if (include_noise) {
+          mout = mean(out, na.rm = TRUE)
+        } else {
+          mout = mean(out[!idx_zeros], na.rm = TRUE)
+        }
+      }
+
       if (is.nan(mout)) mout = 0
-      attr(mout, "n.not.sel") = sum(is.na(out[idx_zeros]))
+      attr(mout, "n.not.sel") = sum(out[idx_zeros] == 0)
+      attr(mout, "n.wrong.not.sel") = sum(tmp$means.x[tmp$means.y==0] != 0)
     }
     return (mout)
   })
@@ -292,7 +315,8 @@ getNoiseMSE = function (real_params, est_params, include_noise = TRUE)
   #browser()
   mout = mean(unlist(out), na.rm = TRUE)
   n_not_sel = mean(unlist(lapply(out, function(m) attr(m, "n.not.sel"))), na.rm = TRUE)
-  return (list(mean = mout, n_not_sel = n_not_sel))
+  n_wrong_not_sel = mean(unlist(lapply(out, function(m) attr(m, "n.wrong.not.sel"))), na.rm = TRUE)
+  return (list(mean = mout, n_not_sel = n_not_sel, n_wrong_not_sel = n_wrong_not_sel))
 }
 
 

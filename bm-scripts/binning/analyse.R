@@ -71,7 +71,10 @@ df_plt_mem = df_binning_memory %>%
 
 df_plt_mem$ptotal = factor(df_plt_mem$ptotal, levels = as.character(sort(unique(df_plt_mem$ptotal))))
 
-gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
+font_scale = 6
+
+#gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
+ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
   geom_hline(yintercept = 1, col = "dark red", lty = 2) +
   geom_line() +
   geom_point(size = 4) +
@@ -95,6 +98,8 @@ gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group
 
 dinA4width = 210 * font_scale
 ggsave(plot = gg, filename = "binning_memory_rel_lines.pdf", width = dinA4width * 2/3, height = dinA4width * 2/3 * 0.7, units = "mm")
+
+font_scale = 3
 
 tmp = df_binning_memory %>%
   group_by(nrows, ncols, ncolsnoise, method) %>%
@@ -161,9 +166,12 @@ df_plt_run$phase = factor(df_plt_run$phase, levels = c("Initialization + Fitting
 df_plt_run$ptotal = factor(df_plt_run$ptotal, levels = as.character(sort(unique(df_plt_run$ptotal))))
 
 
+font_scale = 3
+
 gg = ggplot() +
+#ggplot() +
   geom_hline(yintercept = 1, lty = 2, col = "dark red") +
-  geom_violin(data = df_plt_run %>% filter(rel_time < 10, rel_time > 2, phase == "Fitting"), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal)), alpha = 0.2) +
+  geom_violin(data = df_plt_run %>% filter(rel_time < 10, rel_time > 2, phase == "Fitting"), aes(x = as.factor(nrows), y = rel_time, fill = as.factor(ptotal), color = as.factor(ptotal)), alpha = 0.2, show.legend = FALSE) +
   theme_minimal(base_family = "Gyre Bonum") +
   theme(
     strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
@@ -178,18 +186,21 @@ gg = ggplot() +
   scale_color_viridis(discrete=TRUE) +
   scale_fill_viridis(discrete=TRUE) +
   xlab("Number of Rows\n(log10 Scale)") +
-  ylab("Speedup\nTime(No Binning) / Time(Binning)") +
+
+  ylab(expression(atop("Speedup\n", paste(Time["No Binning"], "/", Time["Binning"], sep = "")))) +
+  #ylab("Speedup\nTime(No Binning) / Time(Binning)") +
   labs(color = "Number of\nFeatures", fill = "Number of\nFeatures") +
   scale_y_continuous(breaks = c(1, 2, 4, 6)) +
   geom_text(data = data.frame(x = 6, y = 1, label = "Baseline (runtime is equal)", phase = "Initialization + Fitting", ptotal = 250),
-    aes(x = x, y = y, label = label), color = "dark red", vjust = 1.5, hjust = 1, show.legend = FALSE)
+    aes(x = x, y = y, label = label), color = "dark red", vjust = 1.5, hjust = 1, show.legend = FALSE, size = 4)
   #facet_grid(. ~ factor(phase, levels = c("Initialization", "Fitting", "Initialization + Fitting")), scales = "free_y")
 
-dinA4width = 210 * font_scale
+dinA4width = 210 * font_scale / 2
 scale_fac = 2/3
 #scale_fac = 0.5
 ggsave(plot = gg, filename = "binning_runtime_rel_violines.pdf", width = dinA4width * scale_fac, height = dinA4width * 0.8 * scale_fac, units = "mm")
 
+font_scale = 3
 
 tmp = df_binning_runtime %>%
   mutate(time = time_init + time_fit) %>%

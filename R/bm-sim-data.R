@@ -50,11 +50,14 @@ simData = function (n, p, pnoise, sn_ratio = 0, featSimulator = simSplines, seed
 
   for (i in seq_len(p)) {
     # Simulate x value range somewhere between [0, 200]
+    set.seed(seed + i)
     xmin = runif(n = 1L, min = 0, max = 100)
+    set.seed(seed + p + i)
     xmax = xmin + runif(n = 1L, min = 0, max = 100)
 
     # Simulate feature values as uniformly distributed in that range:
     #x = sort(runif(n = n, min = xmin, max = xmax))
+    set.seed(abs(seed - i))
     x = runif(n = n, min = xmin, max = xmax)
 
     # Get values for the linear predictor using the feature simulator:
@@ -91,6 +94,7 @@ simData = function (n, p, pnoise, sn_ratio = 0, featSimulator = simSplines, seed
   } else {
     target_sd = sd(target) / sn_ratio
   }
+  set.seed(seed)
   target = target +  rnorm(n, 0, target_sd)
 
   # Get the final dataset with response (y), effects (x1, ..., xp), and noise features (noise1, noisepnoise):

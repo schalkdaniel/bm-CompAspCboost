@@ -10,7 +10,17 @@ source(paste0(base_dir, "/R/bm-run.R"))
 config = loadConfig(base_sub_dir, cargs)
 mom = config$mom
 
-nm_save = paste0("xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-", digest::sha1(mom), ".Rda")
+tr = 0L
+
+### For testing:
+test = FALSE
+if (test) {
+  mom = 0.00005
+  config = list(n = 10000, p = 20, pnoise = 10, sn_ratio = 1, rep = 1)
+  tr = 100L
+}
+
+nm_save = paste0("restart-xxx-n", config$n, "-p", config$p, "-pnoise", config$pnoise, "-snr", config$sn_ratio, "-rep", config$rep, "-", digest::sha1(mom), ".Rda")
 
 ## Simulate data and create data with noise:
 seed = trunc(config$n / (config$p + config$pnoise) * config$sn_ratio)
@@ -23,10 +33,10 @@ set.seed(seed * config$rep)
 dat_noise$y = rnorm(n = config$n, mean = dat_noise$y, sd = sd(dat_noise$y) / config$sn_ratio)
 
 cnames = colnames(dat_noise)
-max_mstop = 20000L
+max_mstop = 50000L
 
 eps_for_break = 0
-patience = 10L
+patience = 5L
 
 library(compboost)
 
@@ -54,7 +64,7 @@ cboost_cod$addLogger(logger = LoggerOobRisk, use_as_stopper = TRUE, logger_id = 
 
 time_init_cod = proc.time() - time_start_cod
 temp = capture.output({
-  cboost_cod$train(max_mstop, trace = 0L)
+  cboost_cod$train(max_mstop, trace = tr)
 })
 time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
@@ -62,7 +72,7 @@ time_fit_cod = proc.time() - time_start_cod + time_init_cod
 
 ## ------------------------------------
 
-## Binning
+## AGBM
 
 cboost_agbm = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(), optimizer = OptimizerAGBM$new(mom))
 time_start_agbm = proc.time()
@@ -85,14 +95,66 @@ cboost_agbm$addLogger(logger = LoggerTime, use_as_stopper = FALSE, logger_id = "
 
 time_init_agbm = proc.time() - time_start_agbm
 temp = capture.output({
-  cboost_agbm$train(max_mstop, trace = 0L)
+  cboost_agbm$train(max_mstop, trace = tr)
 })
 time_fit_agbm = proc.time() - time_start_agbm + time_init_agbm
 
 
-## ------------------------------------
+iter_agbm = length(cboost_agbm$getInbagRisk() - 1)
+
+
+#### Restart:
+time_start_restart = proc.time()
+
+cboost_restart = Compboost$new(dat_noise, "y", loss = LossQuadratic$new(cboost_agbm$predict(), TRUE), optimizer = OptimizerCoordinateDescent$new())
+
+temp_restart = lapply(cnames[cnames != "y"], function (feat) {
+                        cboost_restart$addBaselearner(feat, "spline", BaselearnerPSpline, df = 5)
+})
+
+cboost_restart$addLogger(logger = LoggerTime, use_as_stopper = FALSE, logger_id = "time",
+                         max_time = 0, time_unit = "seconds")
+
+oob_response_restart = cboost_restart$prepareResponse(dat$data$y)
+oob_data_restart = cboost_restart$prepareData(dat$data)
+cboost_restart$addLogger(logger = LoggerOobRisk, use_as_stopper = TRUE, logger_id = "oob",
+                         used_loss = LossQuadratic$new(oob_response$getPrediction(), TRUE), eps_for_break = eps_for_break, patience = patience, oob_data = oob_data_restart,
+                         oob_response = oob_response_restart)
+
+cboost_restart$addLogger(logger = LoggerTime, use_as_stopper = FALSE, logger_id = "time",
+                         max_time = 0, time_unit = "seconds")
+
+time_init_restart = proc.time() - time_start_restart
+temp = capture.output({
+  cboost_restart$train(max_mstop - iter_agbm, trace = tr)
+})
+time_fit_restart = proc.time() - time_start_restart + time_init_restart
+
 
 ## Save results:
+## ------------------------------------
+
+
+if (test) {
+  risk = cboost_cod$getInbagRisk()
+  risk_oob = cboost_cod$getLoggerData()$oob
+  df_plot_cod = data.frame(risk = c(risk, risk_oob), iter = c(seq_along(risk), seq_along(risk_oob)),
+    type = rep(c("inbag", "oob"), c(length(risk), length(risk_oob))), method = "COD")
+
+  inbag_risk_agbm = cboost_agbm$getInbagRisk()
+  inbag_risk_restart = cboost_restart$getInbagRisk()
+  risk = c(inbag_risk_agbm, inbag_risk_restart)
+  risk_oob = c(cboost_agbm$getLoggerData()$oob, cboost_restart$getLoggerData()$oob)
+  df_plot_agbm = data.frame(risk = c(risk, risk_oob), iter = c(seq_along(risk), seq_along(risk_oob)),
+    type = rep(c("inbag", "oob"), c(length(risk), length(risk_oob))), method = "AGBM")
+
+  library(ggplot2)
+  ggplot(rbind(df_plot_cod, df_plot_agbm), aes(x = iter, y = risk, color = type, linetype = method)) + geom_line()
+}
+
+
+time_fit_agbm = proc.time() - time_start_agbm + time_init_agbm
+
 
 bm_extract = list(
   date      = as.character(Sys.time()),
@@ -101,15 +163,19 @@ bm_extract = list(
   config    = config,
   log_cod  = cboost_cod$getLoggerData(),
   risk_cod = cboost_cod$getInbagRisk(),
-  time_cod = c(init = time_init_cod[3], fit = time_fit_cod[3]),
+  #time_cod = c(init = time_init_cod[3], fit = time_fit_cod[3]),
   coef_cod = cboost_cod$getEstimatedCoef(),
   trace_cod = cboost_cod$getSelectedBaselearner(),
   log_agbm    = cboost_agbm$getLoggerData(),
   risk_agbm   = cboost_agbm$getInbagRisk(),
-  time_agbm   = c(init = time_init_agbm[3], fit = time_fit_agbm[3]),
+  #time_agbm   = c(init = time_init_agbm[3], fit = time_fit_agbm[3]),
+  #time_restart   = c(init = time_init_restart[3], fit = time_fit_restart[3]),
   coef_agbm   = cboost_agbm$getEstimatedCoef(),
+  coef_restart = cboost_restart$getEstimatedCoef(),
   trace_agbm = cboost_agbm$getSelectedBaselearner(),
-  trace_agbm_mom = cboost_agbm$optimizer$getSelectedMomentumBaselearner()
+  trace_agbm_mom = cboost_agbm$optimizer$getSelectedMomentumBaselearner(),
+  iters_agbm = iter_agbm,
+  iters_restart = length(cboost_restart$getInbagRisk())
 )
 
 save(bm_extract, file = paste0(base_sub_dir, "/", nm_save))
