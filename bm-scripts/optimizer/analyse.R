@@ -113,6 +113,53 @@ df_plt_mem = df_optim_memory %>%
 
 df_plt_mem$ptotal = factor(df_plt_mem$ptotal, levels = as.character(sort(unique(df_plt_mem$ptotal))))
 
+gg = ggplot(data = df_optim_memory, aes(x = as.factor(nrows), y = mem, color = paste0(method, ncols))) + geom_boxplot()
+gg
+
+
+gg = ggplot(
+    data = df_plt_mem %>% filter(ptotal %in% c(10, 30, 75, 100, 150, 300)),
+    aes(x = nrows, y = rel_mem, color = as.factor(ptotal), group = paste0(ncols, ncolsnoise))) +
+  geom_hline(
+    yintercept = 1,
+    color = "dark red",
+    lty = 2) +
+  #geom_line() +
+  geom_smooth(se = FALSE, alpha = 0.7) +
+  geom_point(size = 10, alpha = 0.7) +
+  theme_minimal(base_family = "Gyre Bonum") +
+  theme(
+    strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white"),
+    strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+    axis.text.x = element_text(angle = 45, vjust = 0.5),
+    axis.text = element_text(size = 8 * font_scale),
+    axis.title = element_text(size = 10 * font_scale),
+    legend.text = element_text(size = 6 * font_scale),
+    legend.title = element_text(size = 8 * font_scale)
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(df_plt_mem$nrows)),
+    trans = "log10") +
+  scale_y_continuous(breaks = c(1, 2, 4, 6)) +
+  scale_color_viridis(discrete = TRUE) +
+  xlab("Number of Rows\n(log10 Scale)") +
+  ylab(expression(atop("Memory improvement\n", paste(Mem["CWB"], "/", Mem["ACWB"], sep = "")))) +
+  labs(color = "Number of\nFeatures") +
+  annotate("text",
+    x = max(df_plt_mem$nrows),
+    y = 1,
+    label = "Baseline (used memory is equal)",
+    color = "dark red",
+    vjust = 1.5,
+    hjust = 1,
+    size = 1.5 * font_scale)
+
+
+
+
+ggplot(data = df_plt_mem %>% filter(rel_mem < 1.1), aes(x = as.factor(nrows), y = rel_mem, color = as.factor(ncols), fill = as.factor(ncols))) +
+  geom_boxplot(alpha = 0.2)
+
 gg = ggplot(data = df_plt_mem, aes(x = nrows, y = rel_mem, color = ptotal, group = paste0(ncols, ncolsnoise))) +
   geom_hline(yintercept = 1, col = "dark red", lty = 2) +
   geom_line() +

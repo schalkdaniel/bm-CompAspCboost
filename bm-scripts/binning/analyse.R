@@ -224,14 +224,136 @@ knitr::kable(round(tmp, 2), format = "latex")
 ## performance
 ## ----------------------------------------------
 
+seed = 31415
+
+n = 10000
+p = 4
+pnoise = 2
+sn_ratio = 0.4
+
+set.seed(seed)
+dat = simData(n, p, pnoise)
+dat_noise = dat$data
+set.seed(seed)
+dat_noise$y = rnorm(n = n, mean = dat_noise$y, sd = sd(dat_noise$y) / sn_ratio)
+
+library(compboost)
+
+set.seed(seed)
+cboost = boostSplines(data = dat_noise, target = "y", iterations = 10000L, learning_rate = 0.01,
+  loss = LossQuadratic$new(), stop_args = list(eps_for_break = 0, patience = 3L), oob_fraction = 0.3,
+  df = 7)
+
+set.seed(seed)
+cboost_bin = boostSplines(data = dat_noise, target = "y", iterations = 10000L, learning_rate = 0.01,
+  loss = LossQuadratic$new(), stop_args = list(eps_for_break = 0, patience = 3L), oob_fraction = 0.3,
+  bin_root = 2, df = 7)
+
+
+
+ndata = 1000L
+dat_idx = as.integer(seq(1, n, len = ndata))
+
+feat = colnames(dat$data)[grepl(pattern = "x", x = colnames(dat$data))]
+bls = paste0(feat, "_spline")
+coef_names = c("coef_binning", "coef_nobinning")
+coefs = list(coef_binning = cboost_bin$getEstimatedCoef(), coef_nobinning = cboost$getEstimatedCoef())
+
+out = list()
+for(bl in bls) {
+  bl_nbr = as.numeric(gsub("\\D", "", bl))
+
+  x = dat$data[[paste0("x", bl_nbr)]][dat_idx]
+  y = dat$sim_poly[[bl_nbr]]$y[dat_idx]
+
+  df_temp = data.frame(x = x, truth = y)
+
+  knots = compboostSplines::createKnots(values = x, n_knots = 20, degree = 3)
+  basis = compboostSplines::createSplineBasis(values = x, degree = 3, knots = knots)
+
+  for (cn in coef_names) {
+    params = coefs[[cn]]
+    if (bl %in% names(params)) {
+      param = params[[bl]]
+      pred = basis %*% param
+      df_pred = data.frame(pred)
+    } else {
+      df_pred = data.frame(rep(0, ndata))
+    }
+    colnames(df_pred) = cn
+    df_temp = cbind(df_temp, df_pred, bl = bl)
+  }
+  out[[bl]] = df_temp
+}
+
+ll_fe = lapply(out, function (df) {
+  df %>%
+    pivot_longer(cols = all_of(c(coef_names, "truth")), names_to = "method", values_to = "effect") %>%
+    group_by(method) %>%
+    mutate(y = effect - mean(effect)) %>%
+    arrange(method, x)
+})
+df_fe = do.call(rbind, ll_fe)
+
+feat_id = as.integer(gsub("\\D", "", df_fe$bl))
+feat = paste0("Feature ", feat_id)
+df_fe$feat = factor(feat, levels = paste0("Feature ", sort(unique(feat_id))))
+
+df_fe$line = df_fe$method
+df_fe$line[df_fe$line == "truth"] = "Truth"
+df_fe$line[df_fe$line == "coef_binning"] = "Binning"
+df_fe$line[df_fe$line == "coef_nobinning"] = "No Binning"
+
+df_fe$line = factor(df_fe$line)
+df_fe$line = ordered(df_fe$line, c("Truth", "No Binning", "Binning"))
+df_fe$linetype = ifelse(df_fe$line == "Binning", "solid", "dashed")
+
+df_area = cbind(
+  df_fe %>% select(x, bl, method, y, feat, line) %>% filter(line == "No Binning"),
+  df_fe %>% ungroup() %>% mutate(y_t = y, line_t = line) %>% select(y_t, line_t) %>% filter(line_t == "Truth"))
+
+gg = ggplot() +
+  geom_ribbon(
+    data = df_area,
+    aes(ymin = y, ymax = y_t, x = x),
+    fill = "dark red",
+    alpha = 0.4) +
+  geom_line(
+    data = df_fe,
+    aes(x = x, y = y, color = line, linetype = linetype),
+    lwd = 2) +
+  #scale_color_viridis(discrete = TRUE) +
+  theme_minimal(base_family = "Gyre Bonum") +
+  scale_color_viridis(discrete = TRUE) +
+    theme(
+      strip.background = element_rect(fill = rgb(47,79,79,maxColorValue = 255), color = "white")  ,
+      strip.text = element_text(color = "white", face = "bold", size = 8 * font_scale),
+      axis.title = element_text(size = 10 * font_scale),
+      legend.text = element_text(size = 8 * font_scale)
+      #axis.text.x=element_blank(),
+      #axis.ticks.x=element_blank(),
+      #axis.text.y=element_blank(),
+      #axis.ticks.y=element_blank()
+    ) +
+  xlab("Feature Value") +
+  ylab("Estimated Feature Effect") +
+  labs(color = "", linetype = "") +
+  #scale_x_continuous(breaks = NULL) +
+  scale_linetype(guide = "none") +
+  facet_wrap(. ~ feat, scales = "free_x")#, scales = "free")
+gg
+
+
+
+
 # Performance: Visualize one setting:
 files = list.files("performance", full.names = TRUE)
 files = files[grep("xxx", files)]
 
-fn = "performance/xxx-n10000-p10-pnoise20-snr0.1-rep3-df5-binroot2.Rda"
+#fn = "performance/xxx-n10000-p10-pnoise20-snr0.1-rep3-df5-binroot2.Rda"
 fn = "performance/xxx-n50000-p10-pnoise20-snr0.1-rep3-df9-binroot2.Rda"
 
-fn = files[100]
+#fn = files[100]
 load(fn)
 
 coef_names = paste0("coef_", c("binning", "nobinning"))
@@ -277,7 +399,7 @@ gg = ggplot(df_fe, aes(x = x, y = y, color = line)) +
   scale_x_continuous(breaks = NULL) +
   facet_wrap(. ~ feat, scales = "free") +
   ggtitle(paste0("Rows: ", bm_extract$config$n, " SNR: ", bm_extract$config$sn_ratio))
-
+gg
 dinA4width = 210 * font_scale
 ggsave(plot = gg, filename = "binning_performance_effects1.pdf", width = dinA4width, height = dinA4width, units = "mm")
 
@@ -354,10 +476,11 @@ load("ll_rows_performance_measures.Rda")
 df_imse = do.call(rbind, ll_rows)
 df_imse
 
-df_imse %>%
+df_imse = df_imse %>%
   mutate(method_n = ifelse(method == "Binning", paste0(method, " ", bin_root), method)) %>%
-  filter(bin_root != 9) %>%
-  ggplot(aes(x = as.factor(nrows), y = mimse, fill = method_n, color = method_n)) +
+  filter(bin_root != 9) %
+
+  ggplot(df_imse, aes(x = as.factor(nrows), y = mimse, fill = method_n, color = method_n)) +
     geom_boxplot(alpha = 0.5) +
     theme_minimal(base_family = "Gyre Bonum") +
     theme(
